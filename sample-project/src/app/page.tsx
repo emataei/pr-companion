@@ -71,12 +71,17 @@ export default function HomePage() {
 
   const checkHealth = async () => {
     setIsLoadingHealth(true);
+    setHealthStatus(null); // Reset previous status
     try {
       const response = await fetch('/api/health');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       const data: HealthStatus = await response.json();
       setHealthStatus(data);
     } catch (error) {
       console.error('Failed to fetch health status:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setHealthStatus({
         status: 'error',
         timestamp: new Date().toISOString(),
@@ -84,6 +89,8 @@ export default function HomePage() {
         uptime: 0,
         environment: 'unknown'
       });
+      // Show user-friendly error message
+      alert(`Health check failed: ${errorMessage}`);
     } finally {
       setIsLoadingHealth(false);
     }

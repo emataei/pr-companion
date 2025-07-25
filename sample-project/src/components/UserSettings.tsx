@@ -1,22 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+
+interface NotificationSettings {
+  email: boolean;
+  push: boolean;
+  sms: boolean;
+  frequency: 'immediate' | 'daily' | 'weekly';
+}
+
+interface PrivacySettings {
+  publicProfile: boolean;
+  shareAnalytics: boolean;
+  allowIndexing: boolean;
+  showOnlineStatus: boolean;
+}
 
 interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
-  notifications: {
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-  };
-  privacy: {
-    publicProfile: boolean;
-    shareAnalytics: boolean;
-  };
+  notifications: NotificationSettings;
+  privacy: PrivacySettings;
   language: string;
+  timezone: string;
+  accessibility: {
+    highContrast: boolean;
+    largeText: boolean;
+    reduceMotion: boolean;
+  };
 }
 
 interface UserSettingsProps {
   readonly userId: string;
   readonly onSettingsChange?: (settings: UserSettings) => void;
+  readonly isReadOnly?: boolean;
 }
 
 export function UserSettings({ userId, onSettingsChange }: UserSettingsProps) {

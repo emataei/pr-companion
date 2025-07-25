@@ -112,8 +112,10 @@ def setup_github_pages():
     print("✅ GitHub Pages setup complete")
     print("📁 Created:")
     print("   - .nojekyll (prevents Jekyll processing)")
-    print("   - index.html (main dashboard)")
+    print("   - index.html (main dashboard with responsive design)")
     print("   - robots.txt (search engine configuration)")
+    print("🌐 GitHub Pages will be available at: https://[username].github.io/[repo-name]/")
+    print("📊 PR visuals will be accessible at: https://[username].github.io/[repo-name]/pr/[number]/")
 
 if __name__ == "__main__":
     setup_github_pages()

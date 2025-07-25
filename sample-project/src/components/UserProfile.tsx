@@ -79,9 +79,14 @@ export function UserProfile({ title, onSave, variant = 'primary', userId }: User
       await Promise.resolve(onSave(formData))
       setSuccessMessage('Profile updated successfully!')
       setIsEditing(false)
+      // Notify parent component of the change
+      if (onSave) {
+        console.log('Profile update completed successfully')
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while saving'
       setError(errorMessage)
+      console.error('Profile update error:', err)
     } finally {
       setIsLoading(false)
     }
@@ -91,6 +96,7 @@ export function UserProfile({ title, onSave, variant = 'primary', userId }: User
     setIsEditing(!isEditing)
     setError(null)
     setSuccessMessage(null)
+    console.log(`Edit mode toggled: ${!isEditing ? 'enabled' : 'disabled'}`)
   }
 
   return (
