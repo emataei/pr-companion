@@ -46,14 +46,22 @@ export function UserProfile({ title, onSave, variant = 'primary', userId }: User
   useEffect(() => {
     if (userId) {
       const loadUserData = async () => {
+        setIsLoading(true)
+        setError(null)
         try {
-          // Simulate API call
+          // Simulate API call with better error handling
           const response = await fetch(`/api/users/${userId}`)
+          if (!response.ok) {
+            throw new Error(`Failed to load user: ${response.status} ${response.statusText}`)
+          }
           const data = await response.json()
           setUserData(data)
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : 'Failed to load user data'
           setError(errorMessage)
+          console.error('Error loading user data:', err)
+        } finally {
+          setIsLoading(false)
         }
       }
       loadUserData()

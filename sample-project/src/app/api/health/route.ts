@@ -22,10 +22,16 @@ export async function GET() {
     const uptime = process.uptime();
     const memUsage = process.memoryUsage();
     
+    // Simulate service health checks
+    const isDatabaseHealthy = Math.random() > 0.1; // 90% chance of being healthy
+    const isCacheHealthy = Math.random() > 0.05; // 95% chance of being healthy
+    
+    const overallStatus = isDatabaseHealthy && isCacheHealthy ? 'ok' : 'error';
+    
     const healthData: HealthCheckResponse = {
-      status: 'ok',
+      status: overallStatus,
       timestamp: new Date().toISOString(),
-      version: '1.0.0',
+      version: process.env.npm_package_version || '1.0.0',
       uptime: Math.floor(uptime),
       environment: process.env.NODE_ENV || 'development',
       memory: {
@@ -34,12 +40,18 @@ export async function GET() {
         percentage: Math.floor((memUsage.heapUsed / memUsage.heapTotal) * 100)
       },
       services: {
-        database: 'ok',
-        cache: 'ok'
+        database: isDatabaseHealthy ? 'ok' : 'error',
+        cache: isCacheHealthy ? 'ok' : 'error'
       }
     };
 
-    return NextResponse.json(healthData);
+    return NextResponse.json(healthData, {
+      status: overallStatus === 'ok' ? 200 : 503,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Content-Type': 'application/json'
+      }
+    });
   } catch (error) {
     console.error('Health check failed:', error);
     
