@@ -1,0 +1,166 @@
+name: Code Quality Analysis
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  technical-analysis:
+    name: Technical Code Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install system dependencies for visual graph generation
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+      
+      - name: Install Node.js dependencies for dependency analysis
+        run: |
+          npm install -g madge
+          # Install other useful analysis tools
+          npm install -g dependency-cruiser
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.mjs
+            **/*.cjs
+            **/*.vue
+            **/*.svelte
+            **/*.java
+            **/*.cs
+            **/*.go
+            **/*.rs
+            sample-project/**/*.js
+            sample-project/**/*.ts
+            sample-project/**/*.jsx
+            sample-project/**/*.tsx
+          files_ignore: |
+            **/*.md
+            **/*.txt
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            **/Dockerfile
+            **/node_modules/**
+            **/dist/**
+            **/build/**
+      
+      - name: Debug changed files
+        run: |
+          echo "=== Changed Files Debug ==="
+          echo "All changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "Number of changed files: ${{ steps.changed-files.outputs.all_changed_files_count }}"
+          echo "Changed files (space-separated):"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n'
+          echo "=== End Debug ==="
+      
+      - name: Run Quality Gate Analysis
+        id: quality-check
+        run: |
+          echo "Running Quality Gate Analysis..."
+          echo "Changed files from GitHub Actions: '${{ steps.changed-files.outputs.all_changed_files }}'"
+          echo "Number of changed files: ${{ steps.changed-files.outputs.all_changed_files_count }}"
+          
+          if [ -z "${{ steps.changed-files.outputs.all_changed_files }}" ] || [ "${{ steps.changed-files.outputs.all_changed_files_count }}" = "0" ]; then
+            echo "No changed files detected by GitHub Actions. Running quality gate anyway."
+          fi
+          echo "Using detected changed files from GitHub Actions: ${{ steps.changed-files.outputs.all_changed_files }}"
+          export CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+          python .code-analysis/scripts/run_quality_gate.py
+        env:
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+        continue-on-error: true
+
+      - name: Upload Quality Gate Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: quality-gate-results.json
+        if: always()
+
+      - name: Generate Dependency Graph Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          python .code-analysis/scripts/dependency_graph_generator.py \
+            --repo . \
+            --before ${{ github.event.pull_request.base.sha }} \
+            --after ${{ github.event.pull_request.head.sha }} \
+            --pr-output
+        continue-on-error: true
+
+      # POST COMMENTS IN PRIORITY ORDER
+      - name: Post Quality Gate Comment (1st - Blocking Issues)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/quality-gate-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post Dependency Graph Comment (2nd)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/dependency-graph-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Auto-label PR based on quality analysis
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/auto-label-pr.js');
+            return await script({ github, context });
+
+      - name: Check for generated artifacts
+        id: check-artifacts
+        run: |
+          if ls dependency_graph_pr.png *.html *.txt 2>/dev/null; then
+            echo "artifacts-exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "artifacts-exist=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Upload Technical Analysis Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: technical-analysis-results
+          path: |
+            dependency_graph_pr.png
+            *.html
+            *.txt
+        if: always() && github.event_name == 'pull_request' && steps.check-artifacts.outputs.artifacts-exist == 'true'

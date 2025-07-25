@@ -1,0 +1,140 @@
+# Enhanced PR Visuals Configuration - Universal Repository Support
+# This file enables the workflow to work with any repository structure
+
+# Auto-detection settings
+AUTO_DETECTION:
+  # Directories to search for package.json (in order of preference)
+  package_json_paths:
+    - "."
+    - "src"
+    - "app"
+    - "client"
+    - "frontend"
+    - "web"
+    
+  # Standard source directory names to look for
+  source_directory_names:
+    - "src"
+    - "app" 
+    - "components"
+    - "pages"
+    - "lib"
+    - "utils"
+    - "hooks"
+    - "services"
+    - "modules"
+    - "features"
+    
+  # Project type detection patterns
+  project_types:
+    nextjs:
+      files: ["next.config.js", "next.config.ts", "next.config.mjs"]
+      package_deps: ["next"]
+    react:
+      files: []
+      package_deps: ["react"]
+    vue:
+      files: ["vue.config.js", "vite.config.js"]
+      package_deps: ["vue", "@vue/cli"]
+    angular:
+      files: ["angular.json"]
+      package_deps: ["@angular/core"]
+    vite:
+      files: ["vite.config.js", "vite.config.ts"]
+      package_deps: ["vite"]
+    svelte:
+      files: ["svelte.config.js"]
+      package_deps: ["svelte"]
+
+# File patterns for analysis
+FILE_PATTERNS:
+  source_code:
+    - "**/*.js"
+    - "**/*.ts" 
+    - "**/*.jsx"
+    - "**/*.tsx"
+    - "**/*.vue"
+    - "**/*.svelte"
+  
+  configuration:
+    - "**/*.json"
+    - "**/*.yml"
+    - "**/*.yaml"
+    - "**/*.toml"
+    - "**/*.ini"
+    - "**/*.env"
+    - "**/.*rc"
+    - "**/*.config.*"
+    
+  documentation:
+    - "**/*.md"
+    - "**/*.txt"
+    - "**/*.rst"
+    
+  tests:
+    - "**/*.test.*"
+    - "**/*.spec.*"
+    - "**/__tests__/**"
+    - "**/test/**"
+    - "**/tests/**"
+
+# Thresholds for impact assessment
+IMPACT_THRESHOLDS:
+  files:
+    low: 5
+    medium: 10
+    high: 20
+  lines:
+    low: 100
+    medium: 500
+    high: 1000
+
+# Visual generation settings
+VISUALS:
+  heatmap:
+    enabled: true
+    max_files_shown: 10
+    max_directories_shown: 8
+    color_schemes:
+      files: "Reds"
+      directories: "Blues"
+      types: "Set3"
+    
+  dependency_graphs:
+    enabled: true
+    layouts: ["dot", "neato", "circo"]  # Try in order
+    exclude_patterns:
+      - "node_modules"
+      - ".git"
+      - "dist"
+      - "build"
+      - "coverage"
+    max_depth: 3
+    
+  animated_summary:
+    enabled: true
+    progressive_reveal: true
+    include_stats: true
+    project_specific_insights: true
+
+# Repository-specific overrides (customize as needed)
+REPOSITORY_OVERRIDES:
+  # Example for monorepo structure
+  monorepo:
+    source_dirs: ["packages/*/src", "apps/*/src"]
+    project_detection_depth: 2
+    
+  # Example for specific frameworks
+  django:
+    source_dirs: [".", "apps", "project"]
+    file_patterns: ["**/*.py"]
+    
+  laravel:
+    source_dirs: ["app", "resources", "routes"]
+    file_patterns: ["**/*.php"]
+
+# Performance settings
+PERFORMANCE:
+  max_files_to_analyze: 1000
+  timeout_seconds: 300
+  fallback_enabled: true

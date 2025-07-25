@@ -1,0 +1,28 @@
+# Core dependencies for the code evaluation system
+azure-ai-inference==1.0.0b9
+azure-identity
+PyGithub
+sonarqube-api
+pylint
+GitPython
+
+# Additional analysis dependencies
+requests
+pathlib2; python_version < '3.4'
+
+# AI-enhanced analysis tools
+# For Python AST parsing and code analysis
+ast-decompiler
+
+# For dependency graph visualization
+graphviz
+
+# Visual chart generation dependencies
+matplotlib>=3.5.0
+seaborn>=0.11.0
+Pillow>=8.0.0
+pandas>=1.3.0
+numpy>=1.21.0
+
+# For enhanced regex patterns in TypeScript/JavaScript analysis
+regex

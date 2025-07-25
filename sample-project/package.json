@@ -1,0 +1,29 @@
+{
+  "name": "sample-nextjs-project",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"No tests yet\" && exit 0",
+    "health-check": "curl http://localhost:3000/api/health"
+  },
+  "dependencies": {
+    "next": "14.0.0",
+    "playwright": "^1.54.1",
+    "react": "^18",
+    "react-dom": "^18",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.0",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,166 @@
+const fs = require('fs');
+
+/**
+ * Shared utilities for GitHub PR comment management
+ */
+
+/**
+ * Get PR number from GitHub context
+ * @param {object} context - GitHub context object
+ * @returns {number|null} PR number or null if not found
+ */
+function getPRNumber(context) {
+  const prNumber = context.issue?.number || 
+                   context.payload?.pull_request?.number || 
+                   context.payload?.number;
+  
+  return prNumber;
+}
+
+/**
+ * Load JSON results from file
+ * @param {string} filePath - Path to JSON file
+ * @param {object} defaultResults - Default results if file not found
+ * @returns {object} Parsed results or default
+ */
+function loadResults(filePath, defaultResults = {}) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const results = JSON.parse(content);
+    console.log(`Successfully loaded results from ${filePath}`);
+    return results;
+  } catch (error) {
+    console.log(`Could not read ${filePath}:`, error.message);
+    return defaultResults;
+  }
+}
+
+/**
+ * Create or update a PR comment
+ * @param {object} github - GitHub API client
+ * @param {object} context - GitHub context
+ * @param {number} prNumber - PR number
+ * @param {string} commentBody - Comment content
+ * @param {string} identifier - Unique string to identify existing comments
+ * @param {string} commentId - Optional unique comment ID for GitHub Actions workflow
+ * @returns {Promise<void>}
+ */
+async function createOrUpdateComment(github, context, prNumber, commentBody, identifier, commentId = null) {
+  try {
+    console.log(`Creating/updating comment with identifier: "${identifier}"`);
+    
+    // Validate comment size before posting
+    const maxSize = 63000; // GitHub limit is 65536, leave buffer for JSON encoding overhead
+    if (commentBody.length > maxSize) {
+      console.log(`⚠️  Comment too large (${commentBody.length} chars), truncating to ${maxSize} chars`);
+      
+      // Find a good truncation point
+      let truncateAt = maxSize - 300; // Leave room for truncation message
+      const lastNewline = commentBody.lastIndexOf('\n', truncateAt);
+      if (lastNewline > truncateAt * 0.8) {
+        truncateAt = lastNewline;
+      }
+      
+      commentBody = commentBody.substring(0, truncateAt);
+      commentBody += '\n\n---\n**⚠️ Content truncated due to GitHub comment size limits.**\n\n';
+      commentBody += 'Full content available in [workflow artifacts](https://github.com/';
+      commentBody += `${context.repo.owner}/${context.repo.repo}/actions).`;
+      console.log(`✅ Comment truncated to ${commentBody.length} characters`);
+    }
+    
+    // Get all comments on the PR
+    const { data: comments } = await github.rest.issues.listComments({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      issue_number: prNumber,
+    });
+
+    console.log(`Found ${comments.length} existing comments`);
+
+    // Find existing comment by comment ID first (more reliable), then by identifier
+    let existingComment = null;
+    if (commentId) {
+      existingComment = comments.find(comment => 
+        comment.body.includes(`<!-- comment-id: ${commentId} -->`)
+      );
+      if (existingComment) {
+        console.log(`Found existing comment by comment ID: ${commentId}`);
+      }
+    }
+    
+    // Fallback to identifier matching if no comment ID match found
+    if (!existingComment) {
+      existingComment = comments.find(comment => 
+        comment.body.includes(identifier) || 
+        comment.body.startsWith(`## ${identifier}`) ||
+        comment.body.includes(`# ${identifier}`) ||
+        // Also check for "Enhanced PR Visuals" in various formats
+        (identifier === 'Enhanced PR Visuals' && (
+          comment.body.includes('Enhanced PR Visuals') ||
+          comment.body.includes('## Enhanced PR Visuals') ||
+          comment.body.includes('# Enhanced PR Visuals')
+        ))
+      );
+      if (existingComment) {
+        console.log(`Found existing comment by identifier: "${identifier}"`);
+      }
+    }
+
+    // Add comment ID if provided (for GitHub Actions workflow tracking)
+    const finalCommentBody = commentId ? 
+      `${commentBody}\n\n<!-- comment-id: ${commentId} -->` : 
+      commentBody;
+
+    if (existingComment) {
+      console.log(`Updating existing comment (ID: ${existingComment.id})`);
+      await github.rest.issues.updateComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        comment_id: existingComment.id,
+        body: finalCommentBody
+      });
+      console.log('Successfully updated existing comment');
+    } else {
+      console.log('Creating new comment');
+      await github.rest.issues.createComment({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        issue_number: prNumber,
+        body: finalCommentBody
+      });
+      console.log('Successfully created new comment');
+    }
+  } catch (error) {
+    console.error('Error posting/updating comment:', error);
+    throw error;
+  }
+}
+
+/**
+ * Set labels on a PR
+ * @param {object} github - GitHub API client
+ * @param {object} context - GitHub context
+ * @param {number} prNumber - PR number
+ * @param {string[]} labels - Array of label names
+ * @returns {Promise<void>}
+ */
+async function setLabels(github, context, prNumber, labels) {
+  try {
+    await github.rest.issues.setLabels({
+      owner: context.repo.owner,
+      repo: context.repo.repo,
+      issue_number: prNumber,
+      labels: labels
+    });
+  } catch (error) {
+    console.error('Error setting labels:', error);
+    throw error;
+  }
+}
+
+module.exports = {
+  getPRNumber,
+  loadResults,
+  createOrUpdateComment,
+  setLabels
+};

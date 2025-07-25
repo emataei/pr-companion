@@ -1,0 +1,109 @@
+.vscode
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Next.js build artifacts
+.next/
+out/
+build/
+dist/
+
+# Node.js artifacts
+package-lock.json
+yarn.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript build artifacts
+*.tsbuildinfo
+next-env.d.ts
+
+# Screenshot generation artifacts
+screenshots/
+screenshot_urls.json
+visual-diff-results.json
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environment variables (use .env.example as template)
+.env
+
+# Performance metrics and reports (generated during CI/testing)
+performance-metrics.jsonl
+performance-report.html
+SECURITY_PERFORMANCE_REPORT.md
+metrics/
+*-metrics.json
+*-results.json
+*-results.sarif
+historical-metrics.jsonl
+
+# Test files
+*.ps1
+
+# Virtual environments
+venv/
+venv312/
+venv313/
+env/
+ENV/
+.venv/
+.env/
+
+# Python local libraries
+Lib/
+/Scripts/
+Include/
+pyvenv.cfg
+
+# Code analysis outputs (keep directory, ignore generated files)
+.code-analysis/outputs/*
+!.code-analysis/outputs/.gitkeep
+
+# Generated analysis files (should be in outputs directory)
+cognitive_score.json
+cognitive-analysis-results.json
+cognitive_analysis.json
+
+# Local visual testing and sample files
+local-visual-test/
+
+# Generated images and visualizations
+*.png
+*.gif
+*.svg
+!**/assets/**/*.png
+!**/assets/**/*.gif
+!**/assets/**/*.svg
+!**/public/**/*.png
+!**/public/**/*.gif
+!**/public/**/*.svg
+
+# Generated base64 and embed files (for local testing and PR embedding)
+*_base64.txt
+*_embed.md

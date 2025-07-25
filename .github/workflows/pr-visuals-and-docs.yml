@@ -1,0 +1,230 @@
+name: PR Visuals and Documentation
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate-pr-visuals-and-docs:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create output directories
+        run: |
+          mkdir -p .code-analysis/outputs
+          mkdir -p .github/scripts
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+          # Install system dependencies for visualization
+          sudo apt-get update
+          sudo apt-get install -y graphviz graphviz-dev
+          
+          # Install global tools
+          npm install -g madge
+          
+          # Install additional Python dependencies for visuals (if not already in requirements.txt)
+          pip install matplotlib seaborn pandas pillow numpy
+          
+          # Install graphviz Python bindings
+          pip install graphviz
+          
+          # Install Git Python for documentation analysis
+          pip install GitPython
+          
+          # Install Azure AI dependencies for smart documentation analysis
+          pip install azure-ai-inference azure-identity
+
+      - name: Auto-detect project structure
+        id: detect-structure
+        run: python .code-analysis/scripts/detect_project_structure.py
+        env:
+          GITHUB_OUTPUT: ${{ runner.temp }}/github_output
+
+      - name: Install project dependencies
+        run: python .code-analysis/scripts/install_project_dependencies.py
+        env:
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          HAS_PACKAGE_JSON: ${{ steps.detect-structure.outputs.has_package_json }}
+
+      - name: Get changed files for analysis
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.vue
+            **/*.json
+            **/*.md
+            **/*.yml
+            **/*.yaml
+
+      - name: Generate diff stats
+        run: |
+          git diff --numstat origin/${{ github.base_ref }} > .code-analysis/outputs/diff_stats.txt
+          echo "Diff stats generated:"
+          head -10 .code-analysis/outputs/diff_stats.txt
+
+      - name: Debug - List available scripts
+        run: |
+          echo "Listing all scripts in .code-analysis/scripts/"
+          ls -la .code-analysis/scripts/
+
+      - name: Generate dependency graphs
+        run: python .code-analysis/scripts/generate_dependency_graphs.py
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
+          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
+
+      - name: Generate PR impact heatmap
+        run: |
+          echo "Generating optimized PR impact heatmap..."
+          python .code-analysis/scripts/generate_pr_impact_heatmap.py
+
+      - name: Generate development flow
+        run: |
+          echo "Checking if development flow script exists..."
+          ls -la .code-analysis/scripts/generate_development_flow.py || echo "File not found"
+          echo "Running development flow script..."
+          python .code-analysis/scripts/generate_development_flow.py
+
+      - name: Generate story arc animation
+        run: |
+          echo "Checking if story arc script exists..."
+          ls -la .code-analysis/scripts/generate_story_arc.py
+          echo "Running story arc script..."
+          python .code-analysis/scripts/generate_story_arc.py
+
+      - name: Generate animated summary
+        run: python .code-analysis/scripts/generate_animated_summary.py
+        env:
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
+          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
+
+      - name: Generate comprehensive report
+        run: python .code-analysis/scripts/generate_comprehensive_report.py
+        env:
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
+          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
+
+      - name: Generate enhanced visuals report
+        run: |
+          echo "Generating enhanced visuals report with embedded images..."
+          if [ -f ".code-analysis/scripts/generate-embedded-visuals.js" ]; then
+            node .code-analysis/scripts/generate-embedded-visuals.js
+            
+            # Validate report size
+            if [ -f ".code-analysis/outputs/enhanced_image_report.md" ]; then
+              REPORT_SIZE=$(wc -c < .code-analysis/outputs/enhanced_image_report.md)
+              echo "Report size: $REPORT_SIZE characters"
+              if [ "$REPORT_SIZE" -gt 60000 ]; then
+                echo "⚠️  Warning: Report size ($REPORT_SIZE chars) is near GitHub comment limit (65536 chars)"
+              else
+                echo "✅ Report size is within safe limits"
+              fi
+            fi
+          else
+            echo "Enhanced visuals script not found"
+            mkdir -p .code-analysis/outputs
+            echo "# Enhanced Visuals Report" > .code-analysis/outputs/enhanced_image_report.md
+            echo "Enhanced visuals script was not found in the repository." >> .code-analysis/outputs/enhanced_image_report.md
+          fi
+
+      - name: Generate documentation suggestions
+        run: |
+          echo "Analyzing documentation needs..."
+          python .code-analysis/scripts/generate_documentation_suggestions.py || python .code-analysis/scripts/generate_documentation_suggestions_fallback.py
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          # Azure AI Foundry configuration (optional - will fallback to rule-based if not set)
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL || 'gpt-4o' }}
+
+      - name: Upload all visual artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-visuals-and-docs
+          path: |
+            .code-analysis/outputs/dependency_graph_base.png
+            .code-analysis/outputs/dependency_graph_pr.png
+            .code-analysis/outputs/pr_impact_heatmap.png
+            .code-analysis/outputs/development_flow.png
+            .code-analysis/outputs/story_arc.png
+            .code-analysis/outputs/comprehensive_pr_report.md
+            .code-analysis/outputs/enhanced_image_report.md
+            .code-analysis/outputs/documentation_suggestions.md
+            .code-analysis/outputs/animated_summary.md
+            .code-analysis/outputs/diff_stats.txt
+            .code-analysis/outputs/enhanced_visuals_results.json
+            .code-analysis/outputs/documentation_analysis.json
+            .code-analysis/outputs/*.svg
+            .code-analysis/outputs/*.json
+            .code-analysis/outputs/*.md
+            .code-analysis/outputs/*.png
+            .code-analysis/outputs/*.gif
+          retention-days: 30
+
+      - name: Cleanup old visual comments
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
+            return await script({ github, context });
+
+      - name: Comment PR with separate visual posts
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/separate-visuals-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Comment PR with documentation suggestions
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/documentation-suggestions-pr-comment.js');
+            return await script({ github, context });

@@ -1,0 +1,191 @@
+name: AI Cognitive Analysis
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-cognitive-analysis:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install Azure AI dependencies for cognitive analysis
+          pip install azure-ai-inference azure-identity
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.mjs
+            **/*.cjs
+            **/*.vue
+            **/*.svelte
+            **/*.java
+            **/*.cs
+            **/*.go
+            **/*.rs
+            sample-project/**/*.js
+            sample-project/**/*.ts
+            sample-project/**/*.jsx
+            sample-project/**/*.tsx
+          files_ignore: |
+            **/*.md
+            **/*.txt
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            **/Dockerfile
+            **/node_modules/**
+            **/dist/**
+            **/build/**
+
+      - name: Run AI Pre-Review Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/ai_pre_review.py
+          echo "AI-generated analysis for review triage"
+        continue-on-error: true
+
+      - name: Analyze PR Cognitive Complexity
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          python .code-analysis/scripts/run_cognitive_analysis.py
+          echo "AI-generated cognitive complexity analysis"
+        continue-on-error: true
+
+      - name: Run Intent Classification Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/intent_classifier.py \
+            --repo . \
+            --title "${{ github.event.pull_request.title }}" \
+            --description "${{ github.event.pull_request.body }}" \
+            --pr-output
+          echo "AI-generated intent classification analysis"
+        continue-on-error: true
+
+      - name: Run Impact Prediction Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/impact_predictor.py \
+            --repo . \
+            --pr-title "${{ github.event.pull_request.title }}" \
+            --pr-description "${{ github.event.pull_request.body }}" \
+            --pr-output
+          echo "AI-generated impact prediction analysis"
+        continue-on-error: true
+
+      - name: Generate Semantic Commit Story
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/semantic_commit_analyzer.py
+          echo "AI-generated semantic commit story"
+        continue-on-error: true
+
+      # POST AI ANALYSIS COMMENTS IN PRIORITY ORDER
+      - name: Post AI Pre-Review Comment (1st - Priority)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/ai-pre-review-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post Cognitive Complexity Comment (2nd)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/cognitive-analysis-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post Intent Classification Comment (3rd)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post Impact Prediction Comment (4th)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/impact-prediction-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Update PR Description with Semantic Story
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/semantic-commit-pr-description.js');
+            return await script({ github, context });
+
+      - name: Upload AI Analysis Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-cognitive-analysis-results
+          path: |
+            ai_pre_review.json
+            cognitive_analysis.json
+            intent_classification.json
+            impact_prediction.json
+            semantic_commit_analysis.json
+        if: always()
