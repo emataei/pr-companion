@@ -7,9 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit",
     "test": "echo \"No tests yet\" && exit 0",
-    "health-check": "curl http://localhost:3000/api/health"
+    "test:types": "tsc --noEmit --skipLibCheck",
+    "health-check": "curl http://localhost:3000/api/health",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "next": "14.0.0",
