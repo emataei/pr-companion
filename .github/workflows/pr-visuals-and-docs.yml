@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  issues: write
 
 jobs:
   generate-pr-visuals-and-docs:
@@ -177,6 +178,135 @@ jobs:
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL || 'gpt-4o' }}
 
+      - name: Prepare GitHub Pages deployment
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Preparing GitHub Pages deployment for PR visuals..."
+          
+          # Setup GitHub Pages structure
+          python .code-analysis/scripts/setup_github_pages.py
+          
+          # Create the gh-pages directory structure for this PR
+          mkdir -p gh-pages/pr/${{ github.event.pull_request.number }}
+          
+          # Copy all generated PNG and GIF files to gh-pages
+          if [ -d ".code-analysis/outputs" ]; then
+            echo "Copying visual files to gh-pages..."
+            cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No PNG files found"
+            cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No GIF files found"
+            cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No SVG files found"
+            
+            # List what we're deploying
+            echo "Files being deployed to gh-pages:"
+            ls -la gh-pages/pr/${{ github.event.pull_request.number }}/
+          else
+            echo "No outputs directory found"
+          fi
+          
+          # Create an index.html for the PR
+          cat > gh-pages/pr/${{ github.event.pull_request.number }}/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>PR #${{ github.event.pull_request.number }} Visuals</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .visual { margin: 20px 0; text-align: center; }
+                  img { max-width: 100%; height: auto; border: 1px solid #ddd; }
+                  h1 { color: #333; }
+              </style>
+          </head>
+          <body>
+              <h1>PR #${{ github.event.pull_request.number }} Visual Analysis</h1>
+              <div class="visual">
+                  <h2>PR Impact Heatmap</h2>
+                  <img src="pr_impact_heatmap.png" alt="PR Impact Heatmap" />
+              </div>
+              <div class="visual">
+                  <h2>Development Flow</h2>
+                  <img src="development_flow.png" alt="Development Flow" />
+              </div>
+              <div class="visual">
+                  <h2>Story Arc</h2>
+                  <img src="story_arc.png" alt="Story Arc" />
+              </div>
+              <div class="visual">
+                  <h2>Dependency Graphs</h2>
+                  <img src="dependency_graph_base.png" alt="Base Dependency Graph" />
+                  <img src="dependency_graph_pr.png" alt="PR Dependency Graph" />
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'pull_request'
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          keep_files: true
+          commit_message: "Deploy PR #${{ github.event.pull_request.number }} visuals"
+
+      - name: Cleanup old GitHub Pages content
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Cleaning up old PR visual directories..."
+          # Clone the gh-pages branch to clean it up
+          git clone --branch gh-pages --single-branch https://github.com/${{ github.repository }}.git gh-pages-cleanup
+          cd gh-pages-cleanup
+          
+          # Run cleanup (keep last 30 days, max 50 PRs)
+          python ../.code-analysis/scripts/cleanup_github_pages.py
+          
+          # Commit and push changes if any
+          if git diff --quiet; then
+            echo "No cleanup needed"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "Cleanup old PR visuals [skip ci]"
+            git push origin gh-pages
+            echo "Pushed cleanup changes"
+          fi
+
+      - name: Create PR visual URLs
+        if: github.event_name == 'pull_request'
+        id: visual-urls
+        run: |
+          # Generate the GitHub Pages URLs for the images
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          
+          echo "base_url=${BASE_URL}" >> $GITHUB_OUTPUT
+          echo "pr_heatmap_url=${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png" >> $GITHUB_OUTPUT
+          echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
+          echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
+          echo "dependency_base_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png" >> $GITHUB_OUTPUT
+          echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
+          echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
+          
+          # Store URLs in a file for the comment scripts
+          mkdir -p .code-analysis/outputs
+          cat > .code-analysis/outputs/visual_urls.json << EOF
+          {
+            "base_url": "${BASE_URL}",
+            "pr_number": "${PR_NUM}",
+            "urls": {
+              "pr_heatmap": "${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png",
+              "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
+              "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
+              "dependency_base": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png",
+              "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
+              "index": "${BASE_URL}/pr/${PR_NUM}/index.html"
+            }
+          }
+          EOF
+          
+          echo "Visual URLs created and saved to visual_urls.json"
+          cat .code-analysis/outputs/visual_urls.json
+
       - name: Upload all visual artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -211,13 +341,13 @@ jobs:
             const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
             return await script({ github, context });
 
-      - name: Comment PR with separate visual posts
+      - name: Comment PR with GitHub Pages hosted visuals
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const script = require('./.code-analysis/scripts/separate-visuals-pr-comment.js');
+            const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
             return await script({ github, context });
 
       - name: Comment PR with documentation suggestions
