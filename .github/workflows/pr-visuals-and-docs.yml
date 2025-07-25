@@ -192,15 +192,43 @@ jobs:
           # Copy all generated PNG and GIF files to gh-pages
           if [ -d ".code-analysis/outputs" ]; then
             echo "Copying visual files to gh-pages..."
-            cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No PNG files found"
-            cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No GIF files found"
-            cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No SVG files found"
+            
+            # List what files are available
+            echo "Available output files:"
+            ls -la .code-analysis/outputs/
+            
+            # Copy PNG files
+            if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied PNG files"
+            else
+              echo "⚠️ No PNG files found"
+            fi
+            
+            # Copy GIF files  
+            if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied GIF files"
+            else
+              echo "⚠️ No GIF files found"
+            fi
+            
+            # Copy SVG files
+            if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied SVG files"
+            else
+              echo "⚠️ No SVG files found"
+            fi
             
             # List what we're deploying
-            echo "Files being deployed to gh-pages:"
+            echo "Files being deployed to gh-pages/pr/${{ github.event.pull_request.number }}/:"
             ls -la gh-pages/pr/${{ github.event.pull_request.number }}/
+            
+            echo "Complete gh-pages directory structure:"
+            find gh-pages -type f -exec ls -la {} \;
           else
-            echo "No outputs directory found"
+            echo "❌ No outputs directory found"
           fi
           
           # Create an index.html for the PR
@@ -231,8 +259,7 @@ jobs:
                   <img src="story_arc.png" alt="Story Arc" />
               </div>
               <div class="visual">
-                  <h2>Dependency Graphs</h2>
-                  <img src="dependency_graph_base.png" alt="Base Dependency Graph" />
+                  <h2>PR Dependencies</h2>
                   <img src="dependency_graph_pr.png" alt="PR Dependency Graph" />
               </div>
           </body>
@@ -266,6 +293,17 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           enable_jekyll: false
+          force_orphan: false
+
+      - name: Verify deployment
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "✅ GitHub Pages deployment completed"
+          echo "🔗 Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "📊 PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          echo ""
+          echo "⏳ Note: GitHub Pages may take 5-10 minutes to update after deployment"
+          echo "🔄 If links don't work immediately, please wait and try again"
 
       - name: Cleanup old GitHub Pages content (optional)
         if: github.event_name == 'pull_request'
@@ -287,7 +325,6 @@ jobs:
           echo "pr_heatmap_url=${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png" >> $GITHUB_OUTPUT
           echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
           echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
-          echo "dependency_base_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png" >> $GITHUB_OUTPUT
           echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
           echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
           
@@ -301,7 +338,6 @@ jobs:
               "pr_heatmap": "${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png",
               "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
               "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
-              "dependency_base": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png",
               "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
               "index": "${BASE_URL}/pr/${PR_NUM}/index.html"
             }
@@ -317,7 +353,6 @@ jobs:
         with:
           name: pr-visuals-and-docs
           path: |
-            .code-analysis/outputs/dependency_graph_base.png
             .code-analysis/outputs/dependency_graph_pr.png
             .code-analysis/outputs/pr_impact_heatmap.png
             .code-analysis/outputs/development_flow.png

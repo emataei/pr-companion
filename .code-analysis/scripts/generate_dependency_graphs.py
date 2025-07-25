@@ -113,15 +113,26 @@ def create_placeholder_graph(output_file, message, graph_type="Dependency Analys
         return False
 
 
-def generate_dependency_graph(branch_name, output_file, project_structure):
-    """Generate dependency graph for a specific branch"""
+def generate_dependency_graph(branch_name, output_file, project_structure, changed_files=None):
+    """Generate dependency graph for a specific branch, optionally focusing on changed files"""
     print(f"Generating dependency graph for {branch_name}...")
     
     project_dir = project_structure['project_dir']
     source_dirs = project_structure['source_dirs']
     
-    # Find paths to analyze
-    analyze_paths = find_analyzable_paths(project_dir, source_dirs)
+    # If we have changed files, focus analysis on those
+    if changed_files:
+        print(f"Focusing on changed files: {changed_files}")
+        # Try to analyze the directories containing changed files
+        changed_dirs = set()
+        for file in changed_files:
+            dir_path = os.path.dirname(file)
+            if dir_path:
+                changed_dirs.add(dir_path)
+        analyze_paths = list(changed_dirs) if changed_dirs else find_analyzable_paths(project_dir, source_dirs)
+    else:
+        # Find paths to analyze
+        analyze_paths = find_analyzable_paths(project_dir, source_dirs)
     
     if not analyze_paths:
         print("No analyzable JavaScript/TypeScript files found")
@@ -172,47 +183,55 @@ def generate_dependency_graph(branch_name, output_file, project_structure):
     return False
 
 
+def get_changed_files():
+    """Get list of changed files in the PR"""
+    try:
+        # Get changed files between base and HEAD
+        base_ref = os.environ.get('GITHUB_BASE_REF', 'main')
+        changed_files = run_command(f"git diff --name-only origin/{base_ref}...HEAD")
+        if changed_files:
+            files = [f.strip() for f in changed_files.split('\n') if f.strip()]
+            # Filter for JS/TS files
+            js_ts_files = [f for f in files if f.endswith(('.js', '.ts', '.jsx', '.tsx'))]
+            return js_ts_files
+        return []
+    except Exception as e:
+        print(f"Error getting changed files: {e}")
+        return []
+
+
 def main():
-    """Main dependency graph generation logic"""
-    print("Starting dependency graph generation...")
+    """Main dependency graph generation logic - Only generate PR branch graph"""
+    print("Starting PR dependency graph generation...")
     
     # Load project structure
     project_structure = load_project_structure()
     print(f"Project: {project_structure['project_type']} at {project_structure['project_dir']}")
     print(f"Sources: {project_structure['source_dirs']}")
     
+    # Get changed files
+    changed_files = get_changed_files()
+    print(f"Changed JS/TS files: {changed_files}")
+    
     # Get environment variables
-    base_ref = os.environ.get('GITHUB_BASE_REF', 'main')
     head_ref = os.environ.get('GITHUB_HEAD_REF', 'HEAD')
     
     # Ensure output directory exists
     os.makedirs('.code-analysis/outputs', exist_ok=True)
     
-    # Save current branch
-    current_branch = run_command("git rev-parse --abbrev-ref HEAD")
-    
-    # Generate graph for base branch
-    print(f"Switching to base branch: {base_ref}")
-    run_command(f"git checkout origin/{base_ref}")
-    base_success = generate_dependency_graph(
-        base_ref, 
-        ".code-analysis/outputs/dependency_graph_base.png", 
-        project_structure
-    )
-    
-    # Generate graph for PR branch  
-    print(f"Switching to PR branch: {head_ref}")
-    run_command(f"git checkout {current_branch}")
+    # Only generate graph for PR branch (current changes)
+    print("Generating dependency graph for PR changes...")
     pr_success = generate_dependency_graph(
         head_ref, 
         ".code-analysis/outputs/dependency_graph_pr.png", 
-        project_structure
+        project_structure,
+        changed_files
     )
     
     # Save results
     results = {
-        'base_graph_generated': base_success,
         'pr_graph_generated': pr_success,
+        'changed_files': changed_files,
         'project_structure': project_structure,
         'analysis_timestamp': run_command("date -u +%Y-%m-%dT%H:%M:%SZ")
     }
@@ -220,8 +239,8 @@ def main():
     with open('.code-analysis/outputs/dependency_graphs_results.json', 'w') as f:
         json.dump(results, f, indent=2)
     
-    print("Dependency graph generation complete!")
-    return base_success or pr_success
+    print("PR dependency graph generation complete!")
+    return pr_success
 
 
 if __name__ == "__main__":
