@@ -27,9 +27,27 @@ This is a sample Next.js + TypeScript project designed to test the code quality 
 - `PUT /api/users/[id]/settings` - Update user preferences with validation
 - Enhanced user preferences support with accessibility options
 
-## Purpose
+## Getting Started
 
-This project contains intentional code quality issues to demonstrate:
+To run this sample project locally:
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Open browser to http://localhost:3000
+```
+
+## Testing the PR Companion
+
+This project is designed to showcase the PR Companion's visual analysis capabilities:
+- Make changes to components in `src/components/`
+- Create a Pull Request
+- Watch as the PR Companion generates visual analysis automatically
+- View the results on GitHub Pages at: https://emataei.github.io/pr-companion/
 
 - **Security Issues**: Hardcoded secrets, SQL injection vulnerabilities
 - **Type Safety Issues**: Missing TypeScript annotations, `any` types
