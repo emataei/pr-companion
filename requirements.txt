@@ -16,6 +16,7 @@ ast-decompiler
 
 # For dependency graph visualization
 graphviz
+networkx>=2.8.0
 
 # Visual chart generation dependencies
 matplotlib>=3.5.0
