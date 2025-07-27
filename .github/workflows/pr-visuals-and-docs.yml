@@ -225,8 +225,40 @@ jobs:
             echo "Files being deployed to gh-pages/pr/${{ github.event.pull_request.number }}/:"
             ls -la gh-pages/pr/${{ github.event.pull_request.number }}/
             
+            # Show file sizes and types
+            echo "File details:"
+            for file in gh-pages/pr/${{ github.event.pull_request.number }}/*; do
+              if [ -f "$file" ]; then
+                echo "  $(basename "$file"): $(wc -c < "$file") bytes, type: $(file -b "$file")"
+              fi
+            done
+            
             echo "Complete gh-pages directory structure:"
             find gh-pages -type f -exec ls -la {} \;
+            
+            # Verify PNG files are actually PNG images
+            echo "Verifying PNG files:"
+            for png_file in gh-pages/pr/${{ github.event.pull_request.number }}/*.png; do
+              if [ -f "$png_file" ]; then
+                echo "  $(basename "$png_file"): $(file "$png_file")"
+              fi
+            done
+            
+            # Create a simple test file to verify deployment
+            echo "Creating test file for deployment verification..."
+            echo "This is a test file created at $(date)" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+            echo "Test file created with content: $(cat gh-pages/pr/${{ github.event.pull_request.number }}/test.txt)"
+            
+            # Final verification before deployment
+            echo ""
+            echo "=== FINAL DEPLOYMENT STRUCTURE ==="
+            echo "Root directory structure:"
+            find gh-pages -type f -name "*.html" -o -name "*.png" -o -name "*.txt" | head -20
+            echo ""
+            echo "PR directory contents:"
+            ls -la gh-pages/pr/${{ github.event.pull_request.number }}/ | head -10
+            echo ""
+            echo "Total files being deployed: $(find gh-pages -type f | wc -l)"
           else
             echo "❌ No outputs directory found"
           fi
@@ -281,6 +313,22 @@ jobs:
           ls -la gh-pages/ || echo "gh-pages directory not found"
           echo "Contents of PR directory:"
           ls -la gh-pages/pr/${{ github.event.pull_request.number }}/ || echo "PR directory not found"
+          
+          # Check if the main index.html exists
+          if [ -f "gh-pages/index.html" ]; then
+            echo "✅ Main index.html exists"
+            echo "Main index.html size: $(wc -c < gh-pages/index.html) bytes"
+          else
+            echo "❌ Main index.html missing"
+          fi
+          
+          # Check if PR index.html exists
+          if [ -f "gh-pages/pr/${{ github.event.pull_request.number }}/index.html" ]; then
+            echo "✅ PR index.html exists"
+            echo "PR index.html size: $(wc -c < gh-pages/pr/${{ github.event.pull_request.number }}/index.html) bytes"
+          else
+            echo "❌ PR index.html missing"
+          fi
 
       - name: Deploy to GitHub Pages
         if: github.event_name == 'pull_request'
@@ -294,6 +342,7 @@ jobs:
           user_email: 'github-actions[bot]@users.noreply.github.com'
           enable_jekyll: false
           force_orphan: false
+          destination_dir: '.'  # Deploy to root of gh-pages branch
 
       - name: Verify deployment
         if: github.event_name == 'pull_request'
@@ -304,6 +353,37 @@ jobs:
           echo ""
           echo "⏳ Note: GitHub Pages may take 5-10 minutes to update after deployment"
           echo "🔄 If links don't work immediately, please wait and try again"
+          
+          # Test if files are accessible (this will help debug)
+          echo ""
+          echo "Testing file accessibility after deployment:"
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          
+          echo "Expected URLs:"
+          echo "  Main site: ${BASE_URL}/"
+          echo "  PR dashboard: ${BASE_URL}/pr/${PR_NUM}/"
+          echo "  Index URL: ${BASE_URL}/pr/${PR_NUM}/index.html"
+          echo "  Heatmap URL: ${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png"
+          echo "  Development Flow URL: ${BASE_URL}/pr/${PR_NUM}/development_flow.png"
+          echo "  Story Arc URL: ${BASE_URL}/pr/${PR_NUM}/story_arc.png"
+          echo "  Dependency Graph URL: ${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png"
+          echo "  Test file URL: ${BASE_URL}/pr/${PR_NUM}/test.txt"
+          
+          echo ""
+          echo "🔧 TROUBLESHOOTING TIPS:"
+          echo "1. If you see '404 - File not found' errors:"
+          echo "   - Check that GitHub Pages is enabled in repo Settings → Pages"
+          echo "   - Make sure 'Deploy from gh-pages branch' is selected"
+          echo "   - Wait 5-10 minutes after first deployment"
+          echo ""
+          echo "2. If the main site shows 'filename case matches' error:"
+          echo "   - This usually means GitHub Pages needs to be enabled first"
+          echo "   - Go to Settings → Pages and enable it"
+          echo ""
+          echo "3. Files deployed to gh-pages branch:"
+          echo "   - Check the gh-pages branch in your repository"
+          echo "   - All files should be in the root and pr/ subdirectories"
 
       - name: Cleanup old GitHub Pages content (optional)
         if: github.event_name == 'pull_request'
