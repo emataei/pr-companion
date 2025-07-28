@@ -15,7 +15,7 @@
 |------|--------|----------|
 | `AI_FOUNDRY_ENDPOINT` | Your Azure AI endpoint URL | ✅ Yes |
 | `AI_FOUNDRY_TOKEN` | Your Azure AI API key | ✅ Yes |
-| `AI_FOUNDRY_MODEL` | `gpt-4o` (or your model) | ⚪ Optional |
+| `AI_FOUNDRY_MODEL` | `gpt-4o` (or your model) | ✅ Yes |
 
 ## Step 3: Test (30 seconds)
 1. Create any PR in your repository
