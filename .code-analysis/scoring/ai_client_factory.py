@@ -30,6 +30,14 @@ class AIClientFactory:
         if not endpoint:
             raise ValueError("AI_FOUNDRY_ENDPOINT environment variable is required")
         
+        # For Azure OpenAI endpoints, construct the deployment-specific endpoint
+        model_name = os.getenv("AI_FOUNDRY_MODEL", "gpt-4o")
+        if not endpoint.endswith('/'):
+            endpoint += '/'
+        
+        # Construct the deployment-specific endpoint
+        deployment_endpoint = f"{endpoint}openai/deployments/{model_name}"
+        
         # Check if we have an API key or should use DefaultAzureCredential
         token = os.getenv("AI_FOUNDRY_TOKEN")
         if token:
@@ -38,8 +46,9 @@ class AIClientFactory:
             credential = DefaultAzureCredential()
         
         return ChatCompletionsClient(
-            endpoint=endpoint,
-            credential=credential
+            endpoint=deployment_endpoint,
+            credential=credential,
+            api_version="2024-12-01-preview"
         )
     
     @staticmethod
