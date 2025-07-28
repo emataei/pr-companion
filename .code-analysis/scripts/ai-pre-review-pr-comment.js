@@ -48,6 +48,9 @@ function buildComment(results) {
   // Load quality gate results
   const qualityResults = loadResults('quality-gate-results.json', null);
   
+  // Load intent classification results
+  const intentResults = loadResults('intent-classification-results.json', null);
+  
   let comment = `## AI Pre-Review Analysis\n\n`;
   
   // Header with key metrics (include quality score if available)
@@ -61,12 +64,26 @@ function buildComment(results) {
     }
     headerMetrics += ` | **Quality:** ${displayScore}/100 ${qualityStatus}`;
   }
+  
+  // Add change intent to header if available
+  if (intentResults && intentResults.primary_intent) {
+    const intentLabel = intentResults.primary_intent.toUpperCase();
+    const intentConf = Math.round(intentResults.confidence * 100);
+    headerMetrics += ` | **Intent:** ${intentLabel} (${intentConf}%)`;
+  }
+  
   comment += `${headerMetrics}\n\n`;
 
   // Quality gate summary (if there are issues)
   const qualitySection = buildQualitySection(qualityResults);
   if (qualitySection) {
     comment += qualitySection;
+  }
+
+  // Change intent section (more precise and valuable)
+  const intentSection = buildIntentSection(intentResults);
+  if (intentSection) {
+    comment += intentSection;
   }
 
   // Concise summary section
@@ -209,6 +226,59 @@ function buildQualitySection(qualityResults) {
       }
       section += `\n`;
     }
+  }
+  
+  section += `\n`;
+  return section;
+}
+
+function buildIntentSection(intentResults) {
+  if (!intentResults || !intentResults.primary_intent) {
+    return ''; // No intent results available
+  }
+  
+  let section = '';
+  
+  // Main intent with confidence
+  const primaryIntent = intentResults.primary_intent.toUpperCase();
+  const confidence = Math.round(intentResults.confidence * 100);
+  
+  section += `**Change Type:** ${primaryIntent} (${confidence}% confidence)`;
+  
+  // Add secondary intents if significant (but don't show percentages that add > 100%)
+  if (intentResults.secondary_intents && intentResults.secondary_intents.length > 0) {
+    const significantSecondary = intentResults.secondary_intents
+      .filter(([intent, conf]) => conf > 0.3) // Higher threshold to avoid clutter
+      .slice(0, 1) // Only show the most significant secondary intent
+      .map(([intent, conf]) => intent.toUpperCase())
+      .join(', ');
+    
+    if (significantSecondary) {
+      section += ` + ${significantSecondary}`;
+    }
+  }
+  
+  section += `\n`;
+  
+  // Show scope information if available
+  if (intentResults.file_changes_summary) {
+    const changes = intentResults.file_changes_summary;
+    const netChange = changes.total_lines_added - changes.total_lines_removed;
+    
+    let changeType = 'refactor';
+    if (netChange > 0) {
+      changeType = 'addition';
+    } else if (netChange < 0) {
+      changeType = 'reduction';
+    }
+    
+    section += `**Scope:** ${changes.total_files} files, ${Math.abs(netChange)} lines ${changeType}`;
+    
+    if (intentResults.affected_areas && intentResults.affected_areas.length > 0 && !intentResults.affected_areas.includes('unknown')) {
+      const areas = intentResults.affected_areas.slice(0, 3).join(', ');
+      section += ` (${areas})`;
+    }
+    section += `\n`;
   }
   
   section += `\n`;

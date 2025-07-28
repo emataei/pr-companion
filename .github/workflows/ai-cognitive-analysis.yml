@@ -155,13 +155,14 @@ jobs:
             const script = require('./.code-analysis/scripts/cognitive-analysis-pr-comment.js');
             return await script({ github, context });
 
-      - name: Post Intent Classification Comment (3rd)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
-            return await script({ github, context });
+      # Intent classification now integrated into AI pre-review comment
+      # - name: Post Intent Classification Comment (3rd)
+      #   if: always() && github.event_name == 'pull_request'
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
+      #       return await script({ github, context });
 
       - name: Update PR Description with Semantic Story
         if: always() && github.event_name == 'pull_request'
