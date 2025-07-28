@@ -10,8 +10,8 @@ module.exports = async ({ github, context }) => {
 
   const results = loadResults('cognitive-analysis-results.json', { 
     tier: 0, 
-    total_score: 0, 
-    reasoning: 'Failed to load results',
+    total_score: null, // Use null instead of 0 to indicate no score available
+    reasoning: 'Analysis in progress or failed to load results',
     complexity_categories: {
       architectural: 'LOW',
       logical: 'LOW', 
@@ -44,23 +44,29 @@ function buildComment(results) {
   
   // Header with complexity and review tiers
   comment += `**Complexity:** ${complexityTier} | **Review:** ${reviewTier}\n`;
-  comment += `**Score:** ${results.total_score} points\n\n`;
-
-  // Complexity category breakdown
-  const categorySection = buildCategorySection(results);
-  if (categorySection) {
-    comment += categorySection;
+  
+  // Only show score if it's meaningful (not null and > 0)
+  if (results.total_score !== null && results.total_score > 0) {
+    comment += `**Score:** ${results.total_score} points\n\n`;
+  } else {
+    comment += `\n`;
   }
 
-  // AST metrics summary
+  // Review guidelines first (more important)
+  const reviewSection = buildReviewSection(results.tier);
+  comment += reviewSection;
+
+  // AST metrics summary (if available)
   const astSection = buildASTSection(results);
   if (astSection) {
     comment += astSection;
   }
 
-  // Review guidelines (removed complex files section)
-  const reviewSection = buildReviewSection(results.tier);
-  comment += reviewSection;
+  // Complexity category breakdown at the end (compact)
+  const categorySection = buildCategorySection(results);
+  if (categorySection) {
+    comment += categorySection;
+  }
 
   // Footer
   comment += `---\n*Cognitive complexity analysis • Auto-updated*`;
@@ -84,8 +90,8 @@ function getComplexityTier(results) {
   const hasMedium = Object.values(categories).some(cat => cat === 'MEDIUM');
   if (hasMedium || score > 30) return 'MEDIUM';
   
-  if (score > 10) return 'LOW';
-  return 'VERY LOW';
+  // Use LOW for all low scores to match Python output
+  return 'LOW';
 }
 
 function getReviewTier(tier) {
@@ -101,20 +107,23 @@ function buildCategorySection(results) {
   const categories = results.complexity_categories;
   if (!categories) return '';
   
-  let section = `### Complexity Categories\n`;
-  section += `| Category | Level | Description |\n`;
-  section += `|----------|-------|-------------|\n`;
+  let section = `### Complexity Breakdown\n`;
+  section += `| Category | Levels |\n`;
+  section += `|----------|--------|\n`;
   
-  const categoryDescriptions = {
-    architectural: 'System design and structure changes',
-    logical: 'Business logic and algorithmic complexity',
-    integration: 'Inter-component and external system interactions', 
-    domain: 'Domain-specific knowledge requirements'
+  const categoryNames = {
+    architectural: 'Architectural',
+    logical: 'Logical',
+    integration: 'Integration', 
+    domain: 'Domain'
   };
   
+  const allLevels = 'LOW • MEDIUM • HIGH • VERY HIGH';
+  
   Object.entries(categories).forEach(([category, level]) => {
-    const desc = categoryDescriptions[category] || 'General complexity';
-    section += `| ${capitalize(category)} | ${level} | ${desc} |\n`;
+    const name = categoryNames[category] || capitalize(category);
+    const levelDisplay = allLevels.replace(level, `**${level}**`);
+    section += `| ${name} | ${levelDisplay} |\n`;
   });
   
   section += `\n`;

@@ -21,17 +21,9 @@ except ImportError:
 
 def save_image_with_base64(fig, base_filename, title="PR Summary"):
     """Save image as PNG and create base64 + markdown files"""
-    # Find the output directory dynamically
-    output_dir = None
-    for check_dir in ['.code-analysis/outputs', '../.code-analysis/outputs', '../../.code-analysis/outputs']:
-        if Path(check_dir).exists() or Path(check_dir).parent.exists():
-            output_dir = Path(check_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            break
-    
-    if not output_dir:
-        output_dir = Path('.code-analysis/outputs')
-        output_dir.mkdir(parents=True, exist_ok=True)
+    # Use standardized output directory
+    output_dir = Path(__file__).parent.parent / 'outputs'  # .code-analysis/outputs
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save PNG file with size optimization
     png_path = output_dir / f"{base_filename}.png"
@@ -123,7 +115,7 @@ def save_image_with_base64(fig, base_filename, title="PR Summary"):
 def load_pr_summary():
     """Load basic PR summary data"""
     # Try to get data from diff stats
-    diff_file = '.code-analysis/outputs/diff_stats.txt'
+    diff_file = Path(__file__).parent.parent / 'outputs' / 'diff_stats.txt'
     if Path(diff_file).exists():
         with open(diff_file, 'r') as f:
             lines = f.readlines()
@@ -220,7 +212,7 @@ def create_no_data_summary():
 
 def create_placeholder():
     """Create text placeholder when matplotlib unavailable"""
-    output_file = '.code-analysis/outputs/story_arc_placeholder.md'
+    output_file = Path(__file__).parent.parent / 'outputs' / 'story_arc_placeholder.md'
     
     with open(output_file, 'w') as f:
         f.write("# PR Story Arc\n\n")
@@ -236,7 +228,8 @@ def main():
     print("Generating optimized PR summary...")
     
     # Ensure output directory exists
-    Path('.code-analysis/outputs').mkdir(parents=True, exist_ok=True)
+    output_dir = Path(__file__).parent.parent / 'outputs'  # .code-analysis/outputs
+    output_dir.mkdir(parents=True, exist_ok=True)
     
     try:
         success = generate_simple_summary()

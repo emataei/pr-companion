@@ -68,6 +68,19 @@ jobs:
             **/dist/**
             **/build/**
 
+      - name: Analyze PR Cognitive Complexity
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/run_cognitive_analysis.py
+          echo "Cognitive complexity analysis complete"
+        continue-on-error: true
+
       - name: Run AI Pre-Review Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -78,19 +91,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           python .code-analysis/scripts/ai_pre_review.py
-          echo "AI-generated analysis for review triage"
-        continue-on-error: true
-
-      - name: Analyze PR Cognitive Complexity
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
-          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
-          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          python .code-analysis/scripts/run_cognitive_analysis.py
-          echo "AI-generated cognitive complexity analysis"
+          echo "AI-generated analysis for review triage (uses cognitive results)"
         continue-on-error: true
 
       - name: Run Intent Classification Analysis
@@ -154,21 +155,14 @@ jobs:
             const script = require('./.code-analysis/scripts/cognitive-analysis-pr-comment.js');
             return await script({ github, context });
 
-      - name: Post Intent Classification Comment (3rd)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
-            return await script({ github, context });
-
-      - name: Post Impact Prediction Comment (4th)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const script = require('./.code-analysis/scripts/impact-prediction-pr-comment.js');
-            return await script({ github, context });
+      # Intent classification now integrated into AI pre-review comment
+      # - name: Post Intent Classification Comment (3rd)
+      #   if: always() && github.event_name == 'pull_request'
+      #   uses: actions/github-script@v7
+      #   with:
+      #     script: |
+      #       const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
+      #       return await script({ github, context });
 
       - name: Update PR Description with Semantic Story
         if: always() && github.event_name == 'pull_request'

@@ -91,8 +91,8 @@ function getImageFormat(fileName) {
 async function generateEnhancedImageReport() {
   console.log('Generating enhanced image report with PNG displays...');
   
-  const outputsDir = '.code-analysis/outputs';
-  const rootDir = '.';
+  // Use the correct path to .code-analysis/outputs directory
+  const outputsDir = path.resolve('..', 'outputs');  // This resolves to .code-analysis/outputs from scripts directory
   
   // Ensure outputs directory exists
   if (!fs.existsSync(outputsDir)) {
@@ -102,11 +102,12 @@ async function generateEnhancedImageReport() {
   
   // Define images with their locations (check root first, then outputs)
   const images = {
-    'pr_impact_heatmap.png': 'PR Impact Heatmap',
-    'development_flow.png': 'Development Flow',
+    'development_flow.png': 'PR Impact Grid',
     'story_arc.png': 'PR Summary',
     'dependency_graph_pr.png': 'PR Dependencies'
   };
+  
+  console.log('Looking for images in:', path.resolve(outputsDir));
   
   let reportContent = '## Enhanced PR Visuals\n\n';
   reportContent += '*Real-time analytics with embedded images for instant viewing*\n\n';
@@ -114,15 +115,14 @@ async function generateEnhancedImageReport() {
   let hasImages = false;
   let totalSize = 0;
   
-  // Helper function to find image in multiple locations
+  // Helper function to find image in the outputs directory only
   function findImage(filename) {
-    const locations = [rootDir, outputsDir];
-    for (const location of locations) {
-      const imagePath = path.join(location, filename);
-      if (fs.existsSync(imagePath)) {
-        return imagePath;
-      }
+    const imagePath = path.join(outputsDir, filename);
+    if (fs.existsSync(imagePath)) {
+      console.log(`Found image: ${imagePath}`);
+      return imagePath;
     }
+    console.log(`Image not found: ${imagePath}`);
     return null;
   }
   

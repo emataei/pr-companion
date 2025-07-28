@@ -1,23 +1,54 @@
-# PR Review Quick Reference
+# ⚡ Quick Review Guide
 
-A quick guide to understanding PR labels and making review decisions.
+**Use PR labels to make fast, effective review decisions.**
 
-## At a Glance
+## 🚨 Instant Decisions
 
-| If you see... | Then... |
-|---------------|---------|
-| `tier:0` + `auto-merge-candidate` | Quick approve if tests pass |
-| `tier:1` + `complexity:low` | You can review (15-30 min) |
-| `tier:2` + `score:good` | Standard review (30-60 min) |
-| `tier:3` + `needs-expert-review` | Route to expert/architect |
-| `tier:4` + `hold-for-discussion` | Schedule team meeting |
-| `score:needs-work` | Send back with feedback |
-| `size:XL` | Block 2+ hours or ask to split |
+| If PR has... | Do this... | Time needed |
+|-------------|-----------|-------------|
+| `tier:0` + `score:excellent` | ✅ **Auto-approve** | 30 seconds |
+| `score:poor` | ❌ **Request changes** | 5 minutes |
+| `size:XL` | 🔄 **Ask to split** | N/A |
+| `tier:4` | 👥 **Schedule discussion** | Meeting |
 
-## Review Decision Tree
+## 📋 Standard Review Flow
 
-```
-PR Opened
+### Step 1: Check Quality Score
+- **90-100** (Excellent) → Fast approval path
+- **70-89** (Good) → Standard review  
+- **50-69** (Needs work) → Focus on highlighted issues
+- **<50** (Poor) → Request major changes
+
+### Step 2: Match Your Expertise
+- **tier:1** → Any developer can review
+- **tier:2** → Senior+ developers  
+- **tier:3** → Domain expert required
+- **tier:4** → Team consensus needed
+
+### Step 3: Allocate Time
+- **XS/S** → 15-30 minutes
+- **M** → 30-60 minutes
+- **L** → 1-2 hours
+- **XL** → Ask to split first
+
+## 🎯 Focus Areas by Type
+
+- **type:feature** → Test new functionality thoroughly
+- **type:bugfix** → Verify fix and test edge cases  
+- **type:refactor** → Check for behavior changes
+- **type:security** → Extra scrutiny required
+- **type:breaking** → Ensure migration path exists
+
+## 🚀 Pro Tips
+
+- **High scores** = Focus on architecture/design
+- **Low scores** = Check basic functionality first  
+- **XL size** = Always request splitting
+- **tier:0** = Safe to auto-approve if tests pass
+
+---
+
+*Labels update automatically on every commit - refresh to see latest status.*
     ↓
 Check Tier Label
     ↓

@@ -90,8 +90,22 @@ cognitive_score.json
 cognitive-analysis-results.json
 cognitive_analysis.json
 
+# Virtual environments and local libraries
+venv*/
+Lib/
+Scripts/
+Include/
+
 # Local visual testing and sample files
 local-visual-test/
+
+# Temporary and test files
+cognitive-analysis-results.json
+test_system.py
+
+# Outdated documentation files
+ENHANCED_PR_VISUALS_SUMMARY.md
+ENHANCED_VISUALS_COMPLETE.md
 
 # Generated images and visualizations
 *.png

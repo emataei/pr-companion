@@ -110,12 +110,11 @@ jobs:
           SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
           PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
 
-      - name: Generate PR impact heatmap
-        run: |
-          echo "Generating optimized PR impact heatmap..."
-          python .code-analysis/scripts/generate_pr_impact_heatmap.py
+      - name: Generate enhanced PR impact analysis (data)
+        run: python .code-analysis/scripts/generate_enhanced_pr_impact.py
+        continue-on-error: true
 
-      - name: Generate development flow
+      - name: Generate development flow (visual)
         run: |
           echo "Checking if development flow script exists..."
           ls -la .code-analysis/scripts/generate_development_flow.py || echo "File not found"
@@ -131,13 +130,6 @@ jobs:
 
       - name: Generate animated summary
         run: python .code-analysis/scripts/generate_animated_summary.py
-        env:
-          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
-          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
-          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
-
-      - name: Generate comprehensive report
-        run: python .code-analysis/scripts/generate_comprehensive_report.py
         env:
           PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
           SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
@@ -169,8 +161,9 @@ jobs:
       - name: Generate documentation suggestions
         run: |
           echo "Analyzing documentation needs..."
-          python .code-analysis/scripts/generate_documentation_suggestions.py || python .code-analysis/scripts/generate_documentation_suggestions_fallback.py
+          python .code-analysis/scripts/generate_smart_documentation_suggestions.py
         env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           # Azure AI Foundry configuration (optional - will fallback to rule-based if not set)
@@ -279,12 +272,9 @@ jobs:
           <body>
               <h1>PR #${{ github.event.pull_request.number }} Visual Analysis</h1>
               <div class="visual">
-                  <h2>PR Impact Heatmap</h2>
-                  <img src="pr_impact_heatmap.png" alt="PR Impact Heatmap" />
-              </div>
-              <div class="visual">
-                  <h2>Development Flow</h2>
-                  <img src="development_flow.png" alt="Development Flow" />
+                  <h2>PR Impact Grid</h2>
+                  <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>
+                  <img src="development_flow.png" alt="PR Impact Grid" />
               </div>
               <div class="visual">
                   <h2>Story Arc</h2>
@@ -364,8 +354,7 @@ jobs:
           echo "  Main site: ${BASE_URL}/"
           echo "  PR dashboard: ${BASE_URL}/pr/${PR_NUM}/"
           echo "  Index URL: ${BASE_URL}/pr/${PR_NUM}/index.html"
-          echo "  Heatmap URL: ${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png"
-          echo "  Development Flow URL: ${BASE_URL}/pr/${PR_NUM}/development_flow.png"
+          echo "  PR Impact Grid URL: ${BASE_URL}/pr/${PR_NUM}/development_flow.png"
           echo "  Story Arc URL: ${BASE_URL}/pr/${PR_NUM}/story_arc.png"
           echo "  Dependency Graph URL: ${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png"
           echo "  Test file URL: ${BASE_URL}/pr/${PR_NUM}/test.txt"
@@ -402,7 +391,6 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
           
           echo "base_url=${BASE_URL}" >> $GITHUB_OUTPUT
-          echo "pr_heatmap_url=${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png" >> $GITHUB_OUTPUT
           echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
           echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
           echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
@@ -415,7 +403,6 @@ jobs:
             "base_url": "${BASE_URL}",
             "pr_number": "${PR_NUM}",
             "urls": {
-              "pr_heatmap": "${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png",
               "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
               "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
               "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
@@ -434,7 +421,6 @@ jobs:
           name: pr-visuals-and-docs
           path: |
             .code-analysis/outputs/dependency_graph_pr.png
-            .code-analysis/outputs/pr_impact_heatmap.png
             .code-analysis/outputs/development_flow.png
             .code-analysis/outputs/story_arc.png
             .code-analysis/outputs/comprehensive_pr_report.md

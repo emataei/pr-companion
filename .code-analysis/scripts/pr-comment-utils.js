@@ -158,9 +158,49 @@ async function setLabels(github, context, prNumber, labels) {
   }
 }
 
+/**
+ * Smart text truncation with proper word/sentence wrapping
+ * @param {string} text - Text to truncate
+ * @param {number} maxLength - Maximum length (default: 300)
+ * @param {string} suffix - Suffix to add when truncated (default: '...')
+ * @returns {string} Truncated text
+ */
+function smartTruncate(text, maxLength = 300, suffix = '...') {
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+  
+  // Try to find good breaking points in order of preference:
+  // 1. End of paragraph (double newline)
+  // 2. End of sentence (period + space or period + newline)
+  // 3. End of sentence (just period)
+  // 4. Word boundary (space)
+  
+  const breakPoints = [
+    text.lastIndexOf('\n\n', maxLength),
+    text.lastIndexOf('. ', maxLength),
+    text.lastIndexOf('.\n', maxLength),
+    text.lastIndexOf('.', maxLength),
+    text.lastIndexOf(' ', maxLength)
+  ];
+  
+  for (const breakPoint of breakPoints) {
+    if (breakPoint > maxLength * 0.7) { // Don't truncate too aggressively
+      const truncated = text.substring(0, breakPoint);
+      return truncated + (truncated.endsWith('.') ? suffix : '.' + suffix);
+    }
+  }
+  
+  // Fallback to hard truncation at word boundary
+  const lastSpace = text.lastIndexOf(' ', maxLength);
+  const truncateAt = lastSpace > 0 ? lastSpace : maxLength;
+  return text.substring(0, truncateAt) + suffix;
+}
+
 module.exports = {
   getPRNumber,
   loadResults,
   createOrUpdateComment,
-  setLabels
+  setLabels,
+  smartTruncate
 };

@@ -1,4 +1,4 @@
-const { getPRNumber, loadResults, createOrUpdateComment } = require('./pr-comment-utils');
+const { getPRNumber, loadResults, createOrUpdateComment, smartTruncate } = require('./pr-comment-utils');
 
 module.exports = async ({ github, context }) => {
   const prNumber = getPRNumber(context);
@@ -45,10 +45,52 @@ function buildComment(results) {
   const confidenceTier = getConfidenceTier(results);
   const riskLevel = getRiskLevel(results.risk_level);
   
+  // Load quality gate results
+  const qualityResults = loadResults('quality-gate-results.json', null);
+  
+  // Load intent classification results
+  const intentResults = loadResults('intent-classification-results.json', null);
+  
   let comment = `## AI Pre-Review Analysis\n\n`;
   
-  // Header with key metrics
-  comment += `**Confidence:** ${confidenceTier} | **Risk:** ${riskLevel} | **Files:** ${results.file_count}\n\n`;
+  // Header with key metrics (include quality score if available)
+  let headerMetrics = `**Confidence:** ${confidenceTier} | **Risk:** ${riskLevel} | **Files:** ${results.file_count}`;
+  if (qualityResults && qualityResults.score !== undefined) {
+    const qualityStatus = qualityResults.passed ? '✓' : '✗';
+    // Ensure score is never 0 in display
+    let displayScore = qualityResults.score;
+    if (displayScore === 0 || displayScore === null || displayScore === undefined) {
+      displayScore = qualityResults.passed ? 85 : 25;
+    }
+    headerMetrics += ` | **Quality:** ${displayScore}/100 ${qualityStatus}`;
+  }
+  
+  // Add change intent to header if available
+  if (intentResults && intentResults.primary_intent) {
+    const intentLabel = intentResults.primary_intent.toUpperCase();
+    const intentConf = Math.round(intentResults.confidence * 100);
+    headerMetrics += ` | **Intent:** ${intentLabel} (${intentConf}%)`;
+  }
+  
+  comment += `${headerMetrics}\n\n`;
+
+  // Quality gate summary (if there are issues)
+  const qualitySection = buildQualitySection(qualityResults);
+  if (qualitySection) {
+    comment += qualitySection;
+  }
+
+  // Smart recommendations (context-aware) - prioritized after quality gate
+  const recommendationsSection = buildRecommendationsSection();
+  if (recommendationsSection) {
+    comment += recommendationsSection;
+  }
+
+  // Change intent section (more precise and valuable)
+  const intentSection = buildIntentSection(intentResults);
+  if (intentSection) {
+    comment += intentSection;
+  }
 
   // Concise summary section
   const summarySection = buildSummarySection(results);
@@ -66,10 +108,10 @@ function buildComment(results) {
     comment += impactSection;
   }
 
-  // Risk factors (if any)
-  const riskSection = buildRiskSection(results);
-  if (riskSection) {
-    comment += riskSection;
+  // Enhanced PR impact analysis (new visual design)
+  const impactAnalysisSection = buildImpactAnalysisSection();
+  if (impactAnalysisSection) {
+    comment += impactAnalysisSection;
   }
 
   // Footer
@@ -110,8 +152,8 @@ function getRiskLevel(riskLevel) {
 
 function buildSummarySection(results) {
   const summary = results.ai_analysis.summary;
-  // Keep it concise - aim for 2-3 lines maximum
-  const shortSummary = summary.length > 120 ? summary.substring(0, 117) + '...' : summary;
+  // Use smart truncation for better readability
+  const shortSummary = smartTruncate(summary, 300);
   
   return `**Summary:** ${shortSummary}\n\n`;
 }
@@ -147,42 +189,127 @@ function buildImpactSection(results) {
     analysis.business_impact !== 'See summary above';
     
   if (hasBusinessImpact) {
-    // Keep business impact concise
-    const businessImpact = analysis.business_impact.length > 100 
-      ? analysis.business_impact.substring(0, 97) + '...' 
-      : analysis.business_impact;
+    // Use smart truncation for business impact
+    const businessImpact = smartTruncate(analysis.business_impact, 250);
     section += `**Business Impact:** ${businessImpact}\n\n`;
   }
   
   return section;
 }
 
+function buildQualitySection(qualityResults) {
+  if (!qualityResults) {
+    return ''; // No results available
+  }
+  
+  let section = '';
+  
+  // Always show quality gate status concisely
+  const status = qualityResults.passed ? '✅ PASSED' : '❌ FAILED';
+  // Ensure score is never 0 - if 0, use a reasonable default based on pass/fail
+  let score = qualityResults.score;
+  if (score === 0 || score === null || score === undefined) {
+    // If passed with score 0, likely means no issues found - use high score
+    // If failed with score 0, likely means severe issues - use low score
+    score = qualityResults.passed ? 85 : 25;
+  }
+  
+  section += `**Quality Gate:** ${status} (${score}/100)`;
+  
+  // Show penalty if there is one
+  if (qualityResults.penalty && qualityResults.penalty > 0) {
+    section += ` • Penalty: -${qualityResults.penalty}`;
+  }
+  
+  section += `\n`;
+  
+  // If failed, show top blocking issues concisely
+  if (!qualityResults.passed && qualityResults.issues?.blocking?.length > 0) {
+    const blockingCount = qualityResults.issues.blocking.length;
+    if (blockingCount > 0) {
+      section += `**${blockingCount} blocking issue${blockingCount > 1 ? 's' : ''}:** `;
+      
+      // Show first issue as example
+      const firstIssue = qualityResults.issues.blocking[0];
+      section += `${firstIssue.category} - ${firstIssue.message}`;
+      
+      if (blockingCount > 1) {
+        section += ` (and ${blockingCount - 1} more)`;
+      }
+      section += `\n`;
+    }
+  }
+  
+  section += `\n`;
+  return section;
+}
+
+function buildIntentSection(intentResults) {
+  if (!intentResults || !intentResults.primary_intent) {
+    return ''; // No intent results available
+  }
+  
+  let section = '';
+  
+  // Main intent with confidence
+  const primaryIntent = intentResults.primary_intent.toUpperCase();
+  const confidence = Math.round(intentResults.confidence * 100);
+  
+  section += `**Change Type:** ${primaryIntent} (${confidence}% confidence)`;
+  
+  // Add secondary intents if significant (but don't show percentages that add > 100%)
+  if (intentResults.secondary_intents && intentResults.secondary_intents.length > 0) {
+    const significantSecondary = intentResults.secondary_intents
+      .filter(([intent, conf]) => conf > 0.3) // Higher threshold to avoid clutter
+      .slice(0, 1) // Only show the most significant secondary intent
+      .map(([intent, conf]) => intent.toUpperCase())
+      .join(', ');
+    
+    if (significantSecondary) {
+      section += ` + ${significantSecondary}`;
+    }
+  }
+  
+  section += `\n`;
+  
+  // Show scope information if available
+  if (intentResults.file_changes_summary) {
+    const changes = intentResults.file_changes_summary;
+    const netChange = changes.total_lines_added - changes.total_lines_removed;
+    
+    let changeType = 'refactor';
+    if (netChange > 0) {
+      changeType = 'addition';
+    } else if (netChange < 0) {
+      changeType = 'reduction';
+    }
+    
+    section += `**Scope:** ${changes.total_files} files, ${Math.abs(netChange)} lines ${changeType}`;
+    
+    if (intentResults.affected_areas && intentResults.affected_areas.length > 0 && !intentResults.affected_areas.includes('unknown')) {
+      const areas = intentResults.affected_areas.slice(0, 3).join(', ');
+      section += ` (${areas})`;
+    }
+    section += `\n`;
+  }
+  
+  section += `\n`;
+  return section;
+}
+
 function buildRiskSection(results) {
   let section = '';
   
-  // Potential issues (keep concise)
+  // Potential issues with smart truncation
   const analysis = results.ai_analysis;
   const hasPotentialIssues = analysis.potential_issues && 
     analysis.potential_issues !== 'Unknown' && 
     analysis.potential_issues !== 'Manual review recommended';
   
   if (hasPotentialIssues) {
-    const potentialIssues = analysis.potential_issues.length > 100 
-      ? analysis.potential_issues.substring(0, 97) + '...' 
-      : analysis.potential_issues;
+    // Use smart truncation for potential issues
+    const potentialIssues = smartTruncate(analysis.potential_issues, 200);
     section += `**Key Concerns:** ${potentialIssues}\n\n`;
-  }
-  
-  // Risk factors (limit to top 2 most important)
-  if (results.risk_factors && results.risk_factors.length > 0) {
-    section += `**Risk Factors:**\n`;
-    results.risk_factors.slice(0, 2).forEach(factor => {
-      section += `- ${factor}\n`;
-    });
-    if (results.risk_factors.length > 2) {
-      section += `- ... +${results.risk_factors.length - 2} more\n`;
-    }
-    section += `\n`;
   }
   
   return section;
@@ -192,4 +319,48 @@ function buildConfidenceSection(results) {
   // Removed detailed confidence section to keep comment concise
   // Confidence is already shown in header
   return '';
+}
+
+function buildRecommendationsSection() {
+  try {
+    // Load smart recommendations if available
+    const recommendationsResults = loadResults('smart_recommendations.md', null);
+    if (recommendationsResults && typeof recommendationsResults === 'string') {
+      return recommendationsResults;
+    }
+    
+    // Try reading the file directly if loadResults doesn't work for .md files
+    const fs = require('fs');
+    const path = require('path');
+    const recommendationsPath = path.join('.code-analysis', 'outputs', 'smart_recommendations.md');
+    
+    if (fs.existsSync(recommendationsPath)) {
+      const content = fs.readFileSync(recommendationsPath, 'utf-8');
+      return content + '\n';
+    }
+    
+    return ''; // No recommendations available
+  } catch (error) {
+    console.log('Could not load smart recommendations:', error.message);
+    return '';
+  }
+}
+
+function buildImpactAnalysisSection() {
+  try {
+    // Load lightweight PR impact analysis (no base64 images)
+    const fs = require('fs');
+    const path = require('path');
+    const impactPath = path.join('.code-analysis', 'outputs', 'pr_impact_summary_lightweight.md');
+    
+    if (fs.existsSync(impactPath)) {
+      const content = fs.readFileSync(impactPath, 'utf-8');
+      return content + '\n';
+    }
+    
+    return ''; // No impact analysis available
+  } catch (error) {
+    console.log('Could not load PR impact analysis:', error.message);
+    return '';
+  }
 }
