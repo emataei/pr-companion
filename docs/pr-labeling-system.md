@@ -1,22 +1,46 @@
-# PR Review Labels Guide
+# 🏷️ Auto-Generated PR Labels
 
-This guide explains the automated labels that appear on pull requests to help reviewers quickly understand what level of review is needed.
+**PR Companion automatically applies these labels to help reviewers prioritize and route PRs effectively.**
 
-## Review Tier Labels
+## 🎯 Review Priority Labels
 
-These labels tell you who should review the PR:
+| Label | Action Required | Review Time |
+|-------|----------------|-------------|
+| `tier:0` | **Quick approval** | 2-5 minutes |
+| `tier:1` | **Junior dev review** | 15-30 minutes |
+| `tier:2` | **Senior dev review** | 30-60 minutes |  
+| `tier:3` | **Expert review** | 1-2 hours |
+| `tier:4` | **Team discussion** | Meeting required |
 
-| Label | Who Reviews | When to Use |
-|-------|-------------|-------------|
-| `tier:0` | **Auto-merge** | Documentation fixes, typos, minor config changes |
-| `tier:1` | **Junior developer** | Simple bug fixes, basic features |
-| `tier:2` | **Senior developer** | Standard features, moderate changes |
-| `tier:3` | **Expert/architect** | Complex logic, architecture changes |
-| `tier:4` | **Team discussion** | Breaking changes, major decisions needed |
+## 📊 Quality Indicators
 
-## Complexity Labels
+| Label | Meaning | Next Steps |
+|-------|---------|------------|
+| `score:excellent` (90-100) | High quality, ready to merge | Fast-track approval |
+| `score:good` (70-89) | Solid work, minor feedback | Standard review |
+| `score:needs-work` (50-69) | Issues found | Request changes |
+| `score:poor` (<50) | Major problems | Block until fixed |
 
-These labels indicate how much mental effort the review will take:
+## 🎭 Change Type Labels
+
+- `type:feature` - New functionality
+- `type:bugfix` - Bug repairs  
+- `type:refactor` - Code cleanup
+- `type:docs` - Documentation updates
+- `type:config` - Settings/build changes
+- `type:test` - Test additions/updates
+
+## 📏 Size Labels
+
+- `size:XS` (1-10 lines) - Quick change
+- `size:S` (11-50 lines) - Small change  
+- `size:M` (51-200 lines) - Medium change
+- `size:L` (201-500 lines) - Large change
+- `size:XL` (500+ lines) - Consider splitting
+
+---
+
+**All labels are applied automatically** - no manual tagging required.
 
 | Label | Review Time | Description |
 |-------|-------------|-------------|
