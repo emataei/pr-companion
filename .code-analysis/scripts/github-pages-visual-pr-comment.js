@@ -38,26 +38,6 @@ module.exports = async ({ github, context }) => {
       };
     }
 
-    // Read analysis results
-    let analysisContent = '';
-    const analysisPath = path.join('.code-analysis/outputs/comprehensive_pr_report.md');
-    
-    if (fs.existsSync(analysisPath)) {
-      analysisContent = fs.readFileSync(analysisPath, 'utf8');
-    }
-
-    // Prepare analysis summary
-    let analysisSummary;
-    if (analysisContent) {
-      if (analysisContent.length > 3000) {
-        analysisSummary = analysisContent.substring(0, 3000) + '...\n\n[View full analysis on GitHub Pages](' + visualUrls.urls.index + ')';
-      } else {
-        analysisSummary = analysisContent;
-      }
-    } else {
-      analysisSummary = 'Analysis in progress...';
-    }
-
     // Create the comment body with hosted images
     const commentBody = `## PR Visual Analysis
 
@@ -74,7 +54,6 @@ module.exports = async ({ github, context }) => {
 2. **Check the main dashboard**: [Visual Dashboard](${visualUrls.urls.index}) (this usually works first)
 3. **Direct image links**:
    - [PR Impact Grid](${visualUrls.urls.development_flow})
-   - [Dependency Graph](${visualUrls.urls.dependency_pr})
 
 **Common issues:**
 - **404 errors**: GitHub Pages might still be deploying
@@ -94,17 +73,6 @@ This comment will be updated once visuals are confirmed working.
 Shows risk score, review time estimate, file change heatmap, and development intent.
 
 ![PR Impact Grid](${visualUrls.urls.development_flow})
-
-### Dependency Analysis
-Dependencies for the changes in this PR:
-
-![PR Dependencies](${visualUrls.urls.dependency_pr})
-
----
-
-### Analysis Summary
-
-${analysisSummary}
 
 ---
 
@@ -185,7 +153,6 @@ Visual analysis is being generated and deployed to GitHub Pages.
 **Expected URLs:**
 - [Visual Dashboard](${visualUrls.urls.index})
 - [PR Impact Grid](${visualUrls.urls.development_flow})
-- [Dependency Graph](${visualUrls.urls.dependency_pr})
 
 **If this is the first PR:**
 1. GitHub Pages may need to be enabled in repository settings

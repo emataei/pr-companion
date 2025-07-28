@@ -131,13 +131,6 @@ jobs:
           SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
           PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
 
-      - name: Generate comprehensive report
-        run: python .code-analysis/scripts/generate_comprehensive_report.py
-        env:
-          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
-          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
-          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
-
       - name: Generate enhanced visuals report
         run: |
           echo "Generating enhanced visuals report with embedded images..."

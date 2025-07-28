@@ -1,4 +1,4 @@
-const { getPRNumber, loadResults, createOrUpdateComment } = require('./pr-comment-utils');
+const { getPRNumber, loadResults, createOrUpdateComment, smartTruncate } = require('./pr-comment-utils');
 
 module.exports = async ({ github, context }) => {
   const prNumber = getPRNumber(context);
@@ -110,8 +110,8 @@ function getRiskLevel(riskLevel) {
 
 function buildSummarySection(results) {
   const summary = results.ai_analysis.summary;
-  // Keep it concise - aim for 2-3 lines maximum
-  const shortSummary = summary.length > 120 ? summary.substring(0, 117) + '...' : summary;
+  // Use smart truncation for better readability
+  const shortSummary = smartTruncate(summary, 300);
   
   return `**Summary:** ${shortSummary}\n\n`;
 }
@@ -147,10 +147,8 @@ function buildImpactSection(results) {
     analysis.business_impact !== 'See summary above';
     
   if (hasBusinessImpact) {
-    // Keep business impact concise
-    const businessImpact = analysis.business_impact.length > 100 
-      ? analysis.business_impact.substring(0, 97) + '...' 
-      : analysis.business_impact;
+    // Use smart truncation for business impact
+    const businessImpact = smartTruncate(analysis.business_impact, 250);
     section += `**Business Impact:** ${businessImpact}\n\n`;
   }
   
@@ -160,16 +158,15 @@ function buildImpactSection(results) {
 function buildRiskSection(results) {
   let section = '';
   
-  // Potential issues (keep concise)
+  // Potential issues with smart truncation
   const analysis = results.ai_analysis;
   const hasPotentialIssues = analysis.potential_issues && 
     analysis.potential_issues !== 'Unknown' && 
     analysis.potential_issues !== 'Manual review recommended';
   
   if (hasPotentialIssues) {
-    const potentialIssues = analysis.potential_issues.length > 100 
-      ? analysis.potential_issues.substring(0, 97) + '...' 
-      : analysis.potential_issues;
+    // Use smart truncation for potential issues
+    const potentialIssues = smartTruncate(analysis.potential_issues, 200);
     section += `**Key Concerns:** ${potentialIssues}\n\n`;
   }
   

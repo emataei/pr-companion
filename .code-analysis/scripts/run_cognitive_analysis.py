@@ -32,17 +32,101 @@ except ImportError:
             self.ast_metrics = ast_metrics
 
 
+def determine_complexity_categories(pr_files, result):
+    """Determine complexity categories based on file analysis and scores."""
+    
+    # Default categories
+    categories = {
+        'architectural': 'LOW',
+        'logical': 'LOW',
+        'integration': 'LOW',
+        'domain': 'LOW'
+    }
+    
+    if not pr_files:
+        return categories
+    
+    # Analyze files for complexity indicators
+    architectural_indicators = 0
+    logical_indicators = 0
+    integration_indicators = 0
+    domain_indicators = 0
+    
+    for file_data in pr_files:
+        content = file_data.get('content', '').lower()
+        path = file_data.get('path', '').lower()
+        
+        # Architectural complexity indicators
+        if any(keyword in path for keyword in ['config', 'setup', 'architecture', 'infrastructure']):
+            architectural_indicators += 2
+        if any(keyword in content for keyword in ['class ', 'interface', 'abstract', 'extends', 'implements']):
+            architectural_indicators += 1
+            
+        # Logical complexity indicators  
+        if any(keyword in content for keyword in ['if ', 'for ', 'while ', 'switch', 'case']):
+            logical_indicators += 1
+        if any(keyword in content for keyword in ['algorithm', 'recursive', 'optimize', 'complex']):
+            logical_indicators += 2
+            
+        # Integration complexity indicators
+        if any(keyword in content for keyword in ['import ', 'require(', 'api', 'http', 'request']):
+            integration_indicators += 1
+        if any(keyword in path for keyword in ['api', 'service', 'client', 'integration']):
+            integration_indicators += 2
+            
+        # Domain complexity indicators
+        if any(keyword in path for keyword in ['business', 'domain', 'model', 'entity']):
+            domain_indicators += 2
+        if any(keyword in content for keyword in ['business', 'domain', 'rule', 'policy']):
+            domain_indicators += 1
+    
+    # Determine levels based on indicators and scores
+    total_score = result.total_score if hasattr(result, 'total_score') else 0
+    
+    # Scale indicators based on score
+    if total_score > 50:
+        multiplier = 1.5
+    elif total_score > 30:
+        multiplier = 1.2
+    else:
+        multiplier = 1.0
+    
+    # Apply thresholds
+    categories['architectural'] = get_complexity_level(architectural_indicators * multiplier, [2, 4])
+    categories['logical'] = get_complexity_level(logical_indicators * multiplier, [3, 6])
+    categories['integration'] = get_complexity_level(integration_indicators * multiplier, [2, 5])
+    categories['domain'] = get_complexity_level(domain_indicators * multiplier, [2, 4])
+    
+    return categories
+
+
+def get_complexity_level(score, thresholds):
+    """Convert a score to complexity level."""
+    if score >= thresholds[1]:
+        return 'HIGH'
+    elif score >= thresholds[0]:
+        return 'MEDIUM'
+    else:
+        return 'LOW'
+
+
 def run_cognitive_analysis(file_list, quality_penalty=0):
     """Run cognitive analysis on changed files."""
     if not file_list.strip():
         return {
             'tier': 0,
-            'total_score': 0,
+            'total_score': 1,  # Minimum score of 1 instead of 0
             'reasoning': 'No code changes detected',
             'static_score': 0,
             'impact_score': 0,
             'ai_score': 0,
-            'quality_penalty': 0
+            'quality_penalty': 0,
+            'complexity_categories': {
+                'architectural': 'LOW',
+                'logical': 'LOW', 
+                'integration': 'LOW',
+                'domain': 'LOW'
+            }
         }
     
     # Initialize analyzer with fallback
@@ -119,14 +203,22 @@ def run_cognitive_analysis(file_list, quality_penalty=0):
             pass  # Skip files that can't be read
     
     if not pr_files:
+        # Provide meaningful default scores even when no files found
+        complexity_categories = {
+            'architectural': 'LOW',
+            'logical': 'LOW', 
+            'integration': 'LOW',
+            'domain': 'LOW'
+        }
         return {
             'tier': 0,
-            'total_score': quality_penalty,
-            'reasoning': 'No valid code files to analyze',
+            'total_score': max(5 + quality_penalty, 1),  # Minimum score of 1
+            'reasoning': 'No valid code files to analyze - minimal change detected',
             'static_score': 0,
             'impact_score': 0,
             'ai_score': 0,
-            'quality_penalty': quality_penalty
+            'quality_penalty': quality_penalty,
+            'complexity_categories': complexity_categories
         }
     
     # Run cognitive analysis
@@ -134,6 +226,9 @@ def run_cognitive_analysis(file_list, quality_penalty=0):
         result = analyzer.analyze_pr(pr_files, quality_penalty=quality_penalty)
     else:
         result = analyzer.analyze_pr(pr_files)
+    
+    # Determine complexity categories based on scores and content
+    complexity_categories = determine_complexity_categories(pr_files, result)
     
     return {
         'tier': result.tier,
@@ -143,6 +238,7 @@ def run_cognitive_analysis(file_list, quality_penalty=0):
         'impact_score': result.impact_score,
         'ai_score': result.ai_score,
         'quality_penalty': quality_penalty,
+        'complexity_categories': complexity_categories,
         'ast_metrics': result.ast_metrics if hasattr(result, 'ast_metrics') else None
     }
 

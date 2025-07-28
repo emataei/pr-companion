@@ -1,6 +1,55 @@
 const fs = require('fs');
 const { createOrUpdateComment, getPRNumber } = require('./pr-comment-utils');
 
+/**
+ * Check if dependency analysis provides meaningful information
+ * @param {string} baseFile - Path to the dependency analysis file
+ * @returns {boolean} True if dependency analysis should be shown
+ */
+function isDependencyAnalysisUseful(baseFile) {
+  if (!fs.existsSync(baseFile)) {
+    return false;
+  }
+  
+  try {
+    const content = fs.readFileSync(baseFile, 'utf8');
+    
+    // Skip if content is too short (likely just boilerplate)
+    if (content.length < 100) {
+      return false;
+    }
+    
+    // Skip if it contains common "no changes" indicators
+    const noChangeIndicators = [
+      'no significant changes',
+      'no dependency changes',
+      'dependency analysis not available',
+      'no new dependencies',
+      'analysis failed'
+    ];
+    
+    const lowercaseContent = content.toLowerCase();
+    if (noChangeIndicators.some(indicator => lowercaseContent.includes(indicator))) {
+      return false;
+    }
+    
+    // Show if it contains meaningful dependency information
+    const meaningfulIndicators = [
+      'new dependency',
+      'removed dependency', 
+      'version change',
+      'security impact',
+      'breaking change',
+      'major version'
+    ];
+    
+    return meaningfulIndicators.some(indicator => lowercaseContent.includes(indicator));
+  } catch (error) {
+    console.log(`Error checking dependency analysis: ${error.message}`);
+    return false;
+  }
+}
+
 async function postSeparateVisualComments({ github, context }) {
   const prNumber = getPRNumber(context);
   if (!prNumber) {
@@ -17,7 +66,7 @@ async function postSeparateVisualComments({ github, context }) {
     },
     {
       name: 'PR Dependencies',
-      description: 'Dependency graph changes between base and PR branches',
+      description: 'Key dependency changes and impact analysis (shown only when significant)',
       baseFile: '.code-analysis/outputs/dependency_graph_pr_embed.md',
       identifier: 'pr-dependencies'
     }
@@ -25,6 +74,12 @@ async function postSeparateVisualComments({ github, context }) {
 
   for (const visual of visuals) {
     try {
+      // Skip dependency analysis if it's not meaningful
+      if (visual.identifier === 'pr-dependencies' && !isDependencyAnalysisUseful(visual.baseFile)) {
+        console.log(`Skipping ${visual.name} - no significant dependency changes detected`);
+        continue;
+      }
+      
       let content = '';
       
       // Try to read the embed file with base64 image
@@ -47,7 +102,13 @@ ${visual.description}
 ${embedContent}`;
         }
       } else {
-        // Fallback if embed file doesn't exist
+        // Skip posting comment if file doesn't exist (especially for dependencies)
+        if (visual.identifier === 'pr-dependencies') {
+          console.log(`Skipping ${visual.name} - analysis file not generated`);
+          continue;
+        }
+        
+        // Fallback if embed file doesn't exist for other visuals
         content = `## ${visual.name}
 
 ${visual.description}
