@@ -197,29 +197,36 @@ def calculate_risk_score():
 
 
 def estimate_review_time():
-    """Estimate review time based on change complexity"""
+    """Estimate review time based on change complexity (15 min to 2 hours max)"""
     try:
         diff_stats = load_diff_stats()
         if not diff_stats:
-            return "5 min", "#2ECC71"
+            return "15 min", "#2ECC71"
         
         total_files = len(diff_stats)
         total_lines = sum(f['total'] for f in diff_stats)
         
-        # Base time calculation
-        minutes = 5  # Base review time
+        # Base time calculation - start with 15 min minimum
+        minutes = 15
         
-        # Add time per file (2 min per file)
-        minutes += total_files * 2
+        # Add time per file (3 min per file, capped contribution)
+        file_time = min(total_files * 3, 45)  # Cap file contribution at 45 min
+        minutes += file_time
         
-        # Add time per 50 lines (5 min per 50 lines)
-        minutes += (total_lines // 50) * 5
+        # Add time per 25 lines (2 min per 25 lines, capped contribution)
+        line_time = min((total_lines // 25) * 2, 30)  # Cap line contribution at 30 min
+        minutes += line_time
         
-        # Complexity multipliers for certain file types
+        # Complexity multipliers for certain file types (smaller multiplier)
         complex_files = sum(1 for f in diff_stats 
                            if any(f['file'].endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx']))
-        if complex_files > 3:
-            minutes = int(minutes * 1.5)
+        if complex_files > 5:
+            minutes = int(minutes * 1.2)  # Smaller multiplier
+        elif complex_files > 2:
+            minutes = int(minutes * 1.1)
+        
+        # Hard cap at 2 hours (120 minutes)
+        minutes = min(minutes, 120)
         
         # Format time estimate
         if minutes < 60:
@@ -232,7 +239,8 @@ def estimate_review_time():
                 time_str = f"{hours}h {remaining_mins}m"
             else:
                 time_str = f"{hours}h"
-            color = "#E74C3C" if hours > 2 else "#F39C12"
+            # Color coding: green < 45 min, orange < 90 min, red >= 90 min
+            color = "#E74C3C" if minutes >= 90 else "#F39C12"
         
         return time_str, color
         

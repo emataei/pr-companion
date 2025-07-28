@@ -90,8 +90,8 @@ function getComplexityTier(results) {
   const hasMedium = Object.values(categories).some(cat => cat === 'MEDIUM');
   if (hasMedium || score > 30) return 'MEDIUM';
   
-  if (score > 10) return 'LOW';
-  return 'VERY LOW';
+  // Use LOW for all low scores to match Python output
+  return 'LOW';
 }
 
 function getReviewTier(tier) {
@@ -108,8 +108,8 @@ function buildCategorySection(results) {
   if (!categories) return '';
   
   let section = `### Complexity Breakdown\n`;
-  section += `| Category | Current | Scale |\n`;
-  section += `|----------|---------|-------|\n`;
+  section += `| Category | Current |\n`;
+  section += `|----------|----------|\n`;
   
   const categoryNames = {
     architectural: 'Architectural',
@@ -118,12 +118,9 @@ function buildCategorySection(results) {
     domain: 'Domain'
   };
   
-  // All possible levels for awareness
-  const possibleLevels = 'LOW → MEDIUM → HIGH → CRITICAL';
-  
   Object.entries(categories).forEach(([category, level]) => {
     const name = categoryNames[category] || capitalize(category);
-    section += `| ${name} | **${level}** | ${possibleLevels} |\n`;
+    section += `| ${name} | **${level}** |\n`;
   });
   
   section += `\n`;

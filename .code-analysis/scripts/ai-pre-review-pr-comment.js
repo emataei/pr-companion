@@ -45,10 +45,24 @@ function buildComment(results) {
   const confidenceTier = getConfidenceTier(results);
   const riskLevel = getRiskLevel(results.risk_level);
   
+  // Load quality gate results
+  const qualityResults = loadResults('quality-gate-results.json', null);
+  
   let comment = `## AI Pre-Review Analysis\n\n`;
   
-  // Header with key metrics
-  comment += `**Confidence:** ${confidenceTier} | **Risk:** ${riskLevel} | **Files:** ${results.file_count}\n\n`;
+  // Header with key metrics (include quality score if available)
+  let headerMetrics = `**Confidence:** ${confidenceTier} | **Risk:** ${riskLevel} | **Files:** ${results.file_count}`;
+  if (qualityResults && qualityResults.score !== undefined) {
+    const qualityStatus = qualityResults.passed ? '✓' : '✗';
+    headerMetrics += ` | **Quality:** ${qualityResults.score}/100 ${qualityStatus}`;
+  }
+  comment += `${headerMetrics}\n\n`;
+
+  // Quality gate summary (if there are issues)
+  const qualitySection = buildQualitySection(qualityResults);
+  if (qualitySection) {
+    comment += qualitySection;
+  }
 
   // Concise summary section
   const summarySection = buildSummarySection(results);
@@ -64,12 +78,6 @@ function buildComment(results) {
   const impactSection = buildImpactSection(results);
   if (impactSection) {
     comment += impactSection;
-  }
-
-  // Risk factors (if any)
-  const riskSection = buildRiskSection(results);
-  if (riskSection) {
-    comment += riskSection;
   }
 
   // Footer
@@ -155,6 +163,46 @@ function buildImpactSection(results) {
   return section;
 }
 
+function buildQualitySection(qualityResults) {
+  if (!qualityResults || qualityResults.passed) {
+    return ''; // No section needed if quality gate passed or no results
+  }
+  
+  let section = '';
+  
+  // Show only critical blocking issues in a concise way
+  const blockingIssues = qualityResults.issues?.blocking || [];
+  if (blockingIssues.length > 0) {
+    section += `**Code Quality Issues:**\n`;
+    
+    // Group by category for conciseness
+    const issuesByCategory = {};
+    blockingIssues.forEach(issue => {
+      const category = issue.category || 'General';
+      if (!issuesByCategory[category]) {
+        issuesByCategory[category] = [];
+      }
+      issuesByCategory[category].push(issue);
+    });
+    
+    // Show top 2 categories with most critical issues
+    const sortedCategories = Object.entries(issuesByCategory)
+      .sort(([,a], [,b]) => b.length - a.length)
+      .slice(0, 2);
+    
+    sortedCategories.forEach(([category, issues]) => {
+      const issue = issues[0]; // Show first issue as example
+      const count = issues.length;
+      const countText = count > 1 ? ` (${count} issues)` : '';
+      section += `- **${category}${countText}:** ${issue.message}\n`;
+    });
+    
+    section += `\n`;
+  }
+  
+  return section;
+}
+
 function buildRiskSection(results) {
   let section = '';
   
@@ -168,18 +216,6 @@ function buildRiskSection(results) {
     // Use smart truncation for potential issues
     const potentialIssues = smartTruncate(analysis.potential_issues, 200);
     section += `**Key Concerns:** ${potentialIssues}\n\n`;
-  }
-  
-  // Risk factors (limit to top 2 most important)
-  if (results.risk_factors && results.risk_factors.length > 0) {
-    section += `**Risk Factors:**\n`;
-    results.risk_factors.slice(0, 2).forEach(factor => {
-      section += `- ${factor}\n`;
-    });
-    if (results.risk_factors.length > 2) {
-      section += `- ... +${results.risk_factors.length - 2} more\n`;
-    }
-    section += `\n`;
   }
   
   return section;
