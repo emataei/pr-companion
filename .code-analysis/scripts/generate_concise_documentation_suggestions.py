@@ -37,8 +37,8 @@ def generate_concise_docs():
         except:
             pass
     
-    # Debug output
-    print(f"DEBUG: Found {len(changed_files)} changed files: {changed_files}")
+    # Debug output (can be removed in production)
+    # print(f"DEBUG: Found {len(changed_files)} changed files: {changed_files}")
     
     if not changed_files:
         return "## Documentation Update Suggestions\n\n**No documentation updates needed** (unable to detect file changes)\n\n"

@@ -164,42 +164,43 @@ function buildImpactSection(results) {
 }
 
 function buildQualitySection(qualityResults) {
-  if (!qualityResults || qualityResults.passed) {
-    return ''; // No section needed if quality gate passed or no results
+  if (!qualityResults) {
+    return ''; // No results available
   }
   
   let section = '';
   
-  // Show only critical blocking issues in a concise way
-  const blockingIssues = qualityResults.issues?.blocking || [];
-  if (blockingIssues.length > 0) {
-    section += `**Code Quality Issues:**\n`;
-    
-    // Group by category for conciseness
-    const issuesByCategory = {};
-    blockingIssues.forEach(issue => {
-      const category = issue.category || 'General';
-      if (!issuesByCategory[category]) {
-        issuesByCategory[category] = [];
-      }
-      issuesByCategory[category].push(issue);
-    });
-    
-    // Show top 2 categories with most critical issues
-    const sortedCategories = Object.entries(issuesByCategory)
-      .sort(([,a], [,b]) => b.length - a.length)
-      .slice(0, 2);
-    
-    sortedCategories.forEach(([category, issues]) => {
-      const issue = issues[0]; // Show first issue as example
-      const count = issues.length;
-      const countText = count > 1 ? ` (${count} issues)` : '';
-      section += `- **${category}${countText}:** ${issue.message}\n`;
-    });
-    
-    section += `\n`;
+  // Always show quality gate status concisely
+  const status = qualityResults.passed ? '✅ PASSED' : '❌ FAILED';
+  const score = qualityResults.score || 0;
+  
+  section += `**Quality Gate:** ${status} (${score}/100)`;
+  
+  // Show penalty if there is one
+  if (qualityResults.penalty && qualityResults.penalty > 0) {
+    section += ` • Penalty: -${qualityResults.penalty}`;
   }
   
+  section += `\n`;
+  
+  // If failed, show top blocking issues concisely
+  if (!qualityResults.passed && qualityResults.issues?.blocking?.length > 0) {
+    const blockingCount = qualityResults.issues.blocking.length;
+    if (blockingCount > 0) {
+      section += `**${blockingCount} blocking issue${blockingCount > 1 ? 's' : ''}:** `;
+      
+      // Show first issue as example
+      const firstIssue = qualityResults.issues.blocking[0];
+      section += `${firstIssue.category} - ${firstIssue.message}`;
+      
+      if (blockingCount > 1) {
+        section += ` (and ${blockingCount - 1} more)`;
+      }
+      section += `\n`;
+    }
+  }
+  
+  section += `\n`;
   return section;
 }
 

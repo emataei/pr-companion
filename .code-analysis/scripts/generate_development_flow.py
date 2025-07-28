@@ -206,32 +206,37 @@ def estimate_review_time():
         total_files = len(diff_stats)
         total_lines = sum(f['total'] for f in diff_stats)
         
-        # Base time calculation - start with 15 min minimum
+        # More conservative time calculation
+        # Base time: 15 min for any change
         minutes = 15
         
-        # Add time per file (3 min per file, capped contribution)
-        file_time = min(total_files * 3, 45)  # Cap file contribution at 45 min
+        # File complexity: 2 min per file (much more conservative)
+        file_time = min(total_files * 2, 30)  # Cap file contribution at 30 min
         minutes += file_time
         
-        # Add time per 25 lines (2 min per 25 lines, capped contribution)
-        line_time = min((total_lines // 25) * 2, 30)  # Cap line contribution at 30 min
+        # Line complexity: 1 min per 50 lines (much more conservative)
+        line_time = min((total_lines // 50) * 1, 20)  # Cap line contribution at 20 min
         minutes += line_time
         
-        # Complexity multipliers for certain file types (smaller multiplier)
+        # Complexity multipliers for certain file types (very small)
         complex_files = sum(1 for f in diff_stats 
                            if any(f['file'].endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx']))
-        if complex_files > 5:
-            minutes = int(minutes * 1.2)  # Smaller multiplier
-        elif complex_files > 2:
-            minutes = int(minutes * 1.1)
+        if complex_files > 8:
+            minutes = int(minutes * 1.3)  # Only for very complex PRs
+        elif complex_files > 4:
+            minutes = int(minutes * 1.1)  # Minimal bump
         
-        # Hard cap at 2 hours (120 minutes)
-        minutes = min(minutes, 120)
+        # Conservative cap at 90 minutes (1.5 hours) for most cases
+        # Only allow 2 hours for truly massive changes
+        if total_files > 20 or total_lines > 1000:
+            minutes = min(minutes, 120)  # 2 hours max for massive PRs
+        else:
+            minutes = min(minutes, 90)   # 1.5 hours max for normal PRs
         
         # Format time estimate
         if minutes < 60:
             time_str = f"{minutes} min"
-            color = "#2ECC71" if minutes < 30 else "#F39C12"
+            color = "#2ECC71" if minutes <= 30 else "#F39C12"
         else:
             hours = minutes // 60
             remaining_mins = minutes % 60
@@ -239,8 +244,8 @@ def estimate_review_time():
                 time_str = f"{hours}h {remaining_mins}m"
             else:
                 time_str = f"{hours}h"
-            # Color coding: green < 45 min, orange < 90 min, red >= 90 min
-            color = "#E74C3C" if minutes >= 90 else "#F39C12"
+            # Color coding: green <= 30 min, orange <= 60 min, red > 60 min
+            color = "#E74C3C" if minutes > 60 else "#F39C12"
         
         return time_str, color
         
