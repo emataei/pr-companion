@@ -348,10 +348,10 @@ function buildRecommendationsSection() {
 
 function buildImpactAnalysisSection() {
   try {
-    // Load enhanced PR impact analysis if available
+    // Load lightweight PR impact analysis (no base64 images)
     const fs = require('fs');
     const path = require('path');
-    const impactPath = path.join('.code-analysis', 'outputs', 'pr_impact_summary.md');
+    const impactPath = path.join('.code-analysis', 'outputs', 'pr_impact_summary_lightweight.md');
     
     if (fs.existsSync(impactPath)) {
       const content = fs.readFileSync(impactPath, 'utf-8');

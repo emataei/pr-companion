@@ -91,8 +91,8 @@ function getImageFormat(fileName) {
 async function generateEnhancedImageReport() {
   console.log('Generating enhanced image report with PNG displays...');
   
-  const outputsDir = '.code-analysis/outputs';
-  const rootDir = '.';
+  // Use the correct path to .code-analysis/outputs directory
+  const outputsDir = path.resolve('..', 'outputs');  // This resolves to .code-analysis/outputs from scripts directory
   
   // Ensure outputs directory exists
   if (!fs.existsSync(outputsDir)) {
@@ -115,15 +115,14 @@ async function generateEnhancedImageReport() {
   let hasImages = false;
   let totalSize = 0;
   
-  // Helper function to find image in multiple locations
+  // Helper function to find image in the outputs directory only
   function findImage(filename) {
-    const locations = [rootDir, outputsDir];
-    for (const location of locations) {
-      const imagePath = path.join(location, filename);
-      if (fs.existsSync(imagePath)) {
-        return imagePath;
-      }
+    const imagePath = path.join(outputsDir, filename);
+    if (fs.existsSync(imagePath)) {
+      console.log(`Found image: ${imagePath}`);
+      return imagePath;
     }
+    console.log(`Image not found: ${imagePath}`);
     return null;
   }
   

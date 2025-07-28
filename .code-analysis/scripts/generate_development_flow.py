@@ -588,186 +588,96 @@ def create_demo_visual():
 
 def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact):
     """Generate the actual visual with provided data following redesign specifications"""
-    # Create the redesigned layout with optimal spacing to prevent overlaps
-    fig = plt.figure(figsize=(14, 10))  # Larger size for better text spacing
-    gs = GridSpec(4, 2, height_ratios=[1.0, 1.8, 0.7, 0.9], hspace=0.2, wspace=0.25, 
-                  top=0.94, bottom=0.06, left=0.06, right=0.94)
+    # Create clean, simple layout with proper spacing
+    fig = plt.figure(figsize=(12, 8))  # Smaller, more manageable size
+    # Simple grid with good spacing
+    gs = GridSpec(3, 2, height_ratios=[1.2, 1.5, 1.0], hspace=0.4, wspace=0.3, 
+                  top=0.92, bottom=0.08, left=0.08, right=0.92)
     
-    # === TOP LEFT: ENHANCED RISK SCORE ===
+    # === TOP LEFT: RISK SCORE (Clean and Simple) ===
     ax_risk = fig.add_subplot(gs[0, 0])
     
-    # Risk score box with properly centered content and larger height to fit all text
-    risk_box = patches.Rectangle((0.08, 0.15), 0.84, 0.7, facecolor='white', 
-                               edgecolor=risk_color, linewidth=2, alpha=0.95)
+    # Simple risk box without complex styling
+    risk_box = patches.Rectangle((0.1, 0.2), 0.8, 0.6, facecolor='white', 
+                               edgecolor=risk_color, linewidth=2)
     ax_risk.add_patch(risk_box)
     
-    # Risk emoji based on score
-    if risk_score >= 8:
-        risk_emoji = "🔴"
-    elif risk_score >= 5:
-        risk_emoji = "🟡"
-    else:
-        risk_emoji = "🟢"
-    
-    # Better centered text positioning with larger font sizes and significant vertical spacing
-    ax_risk.text(0.5, 0.70, f"RISK: {risk_score}/10 {risk_emoji}", ha='center', va='center', 
-                fontsize=14.5, fontweight='bold', color=risk_color)
-    ax_risk.text(0.5, 0.60, risk_level, ha='center', va='center', 
-                fontsize=12.5, fontweight='bold', color=risk_color)
-    
-    # Add separator line with better spacing
-    ax_risk.plot([0.2, 0.8], [0.50, 0.50], color=risk_color, linewidth=0.8, alpha=0.6)
-    
-    # Risk factors breakdown with better vertical centering
-    security_issues = 1 if risk_score >= 8 else 0
-    if risk_score >= 7:
-        complexity_level = "High"
-    elif risk_score >= 4:
-        complexity_level = "Medium"
-    else:
-        complexity_level = "Low"
-    coverage_pct = max(0, 100 - (risk_score * 10))
-    
-    # Properly centered factor display with increased font sizes and significant vertical spacing
-    # Added much more vertical space between items
-    ax_risk.text(0.5, 0.40, f"🔒 Security Issues: {security_issues}", ha='center', va='center', 
-                fontsize=11, color='#2C3E50')
-    ax_risk.text(0.5, 0.30, f"📏 Complexity: {complexity_level}", ha='center', va='center', 
-                fontsize=11, color='#2C3E50')
-    ax_risk.text(0.5, 0.20, f"🧪 Test Coverage: {coverage_pct}%", ha='center', va='center', 
+    # Simple text without emojis (avoiding font issues)
+    ax_risk.text(0.5, 0.65, f"RISK: {risk_score}/10", ha='center', va='center', 
+                fontsize=16, fontweight='bold', color=risk_color)
+    ax_risk.text(0.5, 0.45, risk_level, ha='center', va='center', 
+                fontsize=14, fontweight='bold', color=risk_color)
+    ax_risk.text(0.5, 0.25, f"Test Coverage: {100-(risk_score*10)}%", ha='center', va='center', 
                 fontsize=11, color='#2C3E50')
     
     ax_risk.set_xlim(0, 1)
     ax_risk.set_ylim(0, 1)
     ax_risk.axis('off')
     
-    # === TOP RIGHT: TIME INVESTMENT BREAKDOWN ===
+    # === TOP RIGHT: TIME INVESTMENT (Clean and Simple) ===
     ax_time = fig.add_subplot(gs[0, 1])
     
-    # Time investment box - matched with risk box for consistency and to fit all content
-    time_box = patches.Rectangle((0.08, 0.15), 0.84, 0.7, facecolor='white', 
-                               edgecolor=time_color, linewidth=2, alpha=0.95)
+    # Simple time box
+    time_box = patches.Rectangle((0.1, 0.2), 0.8, 0.6, facecolor='white', 
+                               edgecolor=time_color, linewidth=2)
     ax_time.add_patch(time_box)
     
-    # Better centered text positioning with larger font sizes and adjusted vertical position
-    ax_time.text(0.5, 0.70, f"Time Investment: {review_time}", ha='center', va='center', 
-                fontsize=14.5, fontweight='bold', color=time_color)
-    
-    # Time breakdown with better centering and more legible font
-    ax_time.text(0.5, 0.60, "[15m fix] [45m test] [24m review]", ha='center', va='center', 
-                fontsize=11, color='#2C3E50', style='italic')
-    
-    # Progress visualization - properly centered in box with adjusted position
-    fix_width = 0.16
-    test_width = 0.38
-    review_width = 0.20
-    
-    # Moved bar down for better spacing
-    y_pos = 0.45
-    bar_height = 0.06
-    start_x = 0.2
-    # Fix time (red)
-    fix_rect = patches.Rectangle((start_x, y_pos), fix_width, bar_height, facecolor='#E74C3C', alpha=0.7)
-    ax_time.add_patch(fix_rect)
-    # Test time (orange)
-    test_rect = patches.Rectangle((start_x + fix_width, y_pos), test_width, bar_height, facecolor='#F39C12', alpha=0.7)
-    ax_time.add_patch(test_rect)
-    # Review time (blue)
-    review_rect = patches.Rectangle((start_x + fix_width + test_width, y_pos), review_width, bar_height, facecolor='#3498DB', alpha=0.7)
-    ax_time.add_patch(review_rect)
+    ax_time.text(0.5, 0.65, f"Time Investment: {review_time}", ha='center', va='center', 
+                fontsize=14, fontweight='bold', color=time_color)
+    ax_time.text(0.5, 0.45, "Fix: 15m | Test: 45m | Review: 30m", ha='center', va='center', 
+                fontsize=11, color='#2C3E50')
     
     ax_time.set_xlim(0, 1)
     ax_time.set_ylim(0, 1)
     ax_time.axis('off')
     
-    # === MIDDLE: SMART FILE IMPACT VISUALIZATION ===
+    # === MIDDLE: FILE IMPACT (Simplified) ===
     ax_files = fig.add_subplot(gs[1, :])
     total_files = file_impact.get('total_files', len(heatmap_data))
-    high_risk_files = max(1, total_files // 8)  # ~12% high risk
-    med_risk_files = max(1, total_files // 5)   # ~20% medium risk
-    low_risk_files = total_files - high_risk_files - med_risk_files
     
-    # Title with optimal spacing and larger font
-    ax_files.text(0.5, 0.96, f"File Impact Summary ({total_files} files)", ha='center', va='top', 
-                 fontsize=14.5, fontweight='bold', color='#2C3E50')
+    # Clean title
+    ax_files.text(0.5, 0.9, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
+                 fontsize=16, fontweight='bold', color='#2C3E50')
     
-    # Separator line - thinner and better positioned
-    ax_files.plot([0.05, 0.95], [0.90, 0.90], color='#34495E', linewidth=0.8)
+    # Simple file categories without complex styling
+    ax_files.text(0.1, 0.7, "HIGH RISK (1 files)", ha='left', va='center', 
+                 fontsize=12, fontweight='bold', color='#E74C3C')
+    ax_files.text(0.15, 0.6, "- /api/auth/* - Security vulnerability", ha='left', va='center', 
+                 fontsize=11, color='#2C3E50')
     
-    # High Risk Files with consistent left alignment and larger font sizes
-    ax_files.text(0.03, 0.82, f"🔴 High Risk ({high_risk_files} files)", ha='left', va='center', 
-                 fontsize=13.5, fontweight='bold', color='#E74C3C')
-    ax_files.text(0.05, 0.76, "└─ /api/auth/* - Security vulnerability", ha='left', va='center', 
-                 fontsize=12, color='#2C3E50')
-    ax_files.text(0.05, 0.71, "└─ /db/migrations/* - Data integrity risk", ha='left', va='center', 
-                 fontsize=12, color='#2C3E50')
+    ax_files.text(0.1, 0.45, "MEDIUM RISK (2 files)", ha='left', va='center', 
+                 fontsize=12, fontweight='bold', color='#F39C12')
+    ax_files.text(0.15, 0.35, "- Complex refactoring needs review", ha='left', va='center', 
+                 fontsize=11, color='#2C3E50')
     
-    # Medium Risk Files with consistent left alignment
-    ax_files.text(0.03, 0.63, f"🟡 Medium Risk ({med_risk_files} files)", ha='left', va='center', 
-                 fontsize=13.5, fontweight='bold', color='#F39C12')
-    ax_files.text(0.05, 0.57, "└─ Complex refactoring needs review", ha='left', va='center', 
-                 fontsize=12, color='#2C3E50')
+    ax_files.text(0.1, 0.2, "LOW RISK (5 files)", ha='left', va='center', 
+                 fontsize=12, fontweight='bold', color='#27AE60')
+    ax_files.text(0.15, 0.1, "- Documentation and formatting", ha='left', va='center', 
+                 fontsize=11, color='#2C3E50')
     
-    # Low Risk Files with consistent left alignment
-    ax_files.text(0.03, 0.49, f"🟢 Low Risk ({low_risk_files} files)", ha='left', va='center', 
-                 fontsize=13.5, fontweight='bold', color='#27AE60')
-    ax_files.text(0.05, 0.43, "└─ Documentation and formatting", ha='left', va='center', 
-                 fontsize=12, color='#2C3E50')
-    
-    # Change Distribution with progress bars - completely restructured for better clarity
-    ax_files.text(0.03, 0.34, "Change Distribution:", ha='left', va='center', 
-                 fontsize=14.5, fontweight='bold', color='#2C3E50')
-    
-    # Modified files progress bar (80%) - with more vertical spacing and aligned labels
-    bar_y1 = 0.26  # First bar position
-    bar_height = 0.05  # Taller bars for better visibility
-    bar_spacing = 0.08  # Space between bars
+    # Simple change distribution bars
+    ax_files.text(0.6, 0.7, "Change Distribution:", ha='left', va='center', 
+                 fontsize=12, fontweight='bold', color='#2C3E50')
     
     # Modified files bar (80%)
-    mod_rect = patches.Rectangle((0.03, bar_y1), 0.30, bar_height, facecolor='#3498DB', alpha=0.8)
+    mod_rect = patches.Rectangle((0.6, 0.55), 0.25, 0.08, facecolor='#3498DB', alpha=0.8)
     ax_files.add_patch(mod_rect)
-    mod_bg = patches.Rectangle((0.33, bar_y1), 0.07, bar_height, facecolor='#BDC3C7', alpha=0.5)
-    ax_files.add_patch(mod_bg)
-    # Label positioned to the right of the bar with larger font
-    ax_files.text(0.43, bar_y1 + bar_height/2, "80% Modified", ha='left', va='center', fontsize=14, color='#2C3E50')
+    ax_files.text(0.87, 0.59, "80% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
     
-    # New files bar (20%) - positioned below with good spacing
-    bar_y2 = bar_y1 - bar_spacing
-    new_rect = patches.Rectangle((0.03, bar_y2), 0.07, bar_height, facecolor='#27AE60', alpha=0.8)
+    # New files bar (20%)
+    new_rect = patches.Rectangle((0.6, 0.4), 0.06, 0.08, facecolor='#27AE60', alpha=0.8)
     ax_files.add_patch(new_rect)
-    new_bg = patches.Rectangle((0.10, bar_y2), 0.30, bar_height, facecolor='#BDC3C7', alpha=0.5)
-    ax_files.add_patch(new_bg)
-    # Label positioned to the right of the bar with larger font
-    ax_files.text(0.43, bar_y2 + bar_height/2, "20% New files", ha='left', va='center', fontsize=14, color='#2C3E50')
+    ax_files.text(0.87, 0.44, "20% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
     
     ax_files.set_xlim(0, 1)
     ax_files.set_ylim(0, 1)
     ax_files.axis('off')
     
-    # === ACTIONABLE DEVELOPMENT INSIGHTS ===
-    ax_insights = fig.add_subplot(gs[2, :])
+    # === BOTTOM: REQUIRED ACTIONS (Clean List) ===
+    ax_actions = fig.add_subplot(gs[2, :])
     
-    # Change Analysis with consistent left alignment matching other sections
-    total_lines = file_impact.get('total_lines_changed', 342)
-    ax_insights.text(0.03, 0.80, "📊 Change Analysis", ha='left', va='center', 
-                    fontsize=14.5, fontweight='bold', color='#2C3E50')
-    ax_insights.text(0.05, 0.65, f"├─ Pattern: Large Refactor ({total_lines} lines)", ha='left', va='center', 
-                    fontsize=12.5, color='#2C3E50')
-    ax_insights.text(0.05, 0.50, "├─ Concern: No test coverage added", ha='left', va='center', 
-                    fontsize=12.5, color='#E74C3C')
-    ax_insights.text(0.05, 0.35, "└─ Recommendation: Split into 3 PRs", ha='left', va='center', 
-                    fontsize=12.5, color='#F39C12')
-    
-    # Required Actions header - positioned at the bottom to be much closer to action items
-    ax_insights.text(0.03, 0.10, "🎯 Required Actions (Prioritized)", ha='left', va='center', 
-                    fontsize=14.5, fontweight='bold', color='#2C3E50')
-    
-    ax_insights.set_xlim(0, 1)
-    ax_insights.set_ylim(0, 1)
-    ax_insights.axis('off')
-    
-    # === REQUIRED ACTIONS (BOTTOM) - Compact layout ===
-    ax_actions = fig.add_subplot(gs[3, :])
+    ax_actions.text(0.1, 0.8, "Required Actions (Prioritized)", ha='left', va='center', 
+                   fontsize=14, fontweight='bold', color='#2C3E50')
     
     actions = [
         "1. Fix security issue in auth.js:L45",
@@ -777,24 +687,17 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     
     action_colors = ['#E74C3C', '#F39C12', '#3498DB']
     
-    # Position actions much higher with minimal spacing between items
     for i, (action, color) in enumerate(zip(actions, action_colors)):
-        y_pos = 0.98 - (i * 0.17)  # Higher position with tighter spacing
-        # Priority indicator with larger sizing for better visibility
-        priority_circle = patches.Circle((0.04, y_pos), 0.045, facecolor=color, alpha=0.8)
-        ax_actions.add_patch(priority_circle)
-        ax_actions.text(0.04, y_pos, str(i+1), ha='center', va='center', 
-                       fontsize=12, fontweight='bold', color='white')
-        # Action text with optimal positioning, consistent left alignment and significantly larger font
-        ax_actions.text(0.08, y_pos, action, ha='left', va='center', 
-                       fontsize=15, color='#2C3E50')
+        y_pos = 0.6 - (i * 0.2)
+        ax_actions.text(0.1, y_pos, action, ha='left', va='center', 
+                       fontsize=12, color=color, fontweight='bold')
     
     ax_actions.set_xlim(0, 1)
     ax_actions.set_ylim(0, 1)
     ax_actions.axis('off')
     
-    # Overall title with optimal positioning and larger font
-    fig.suptitle('PR Impact Analysis', fontsize=16, fontweight='bold', y=0.97, color='#2C3E50')
+    # Clean title
+    fig.suptitle('PR Impact Analysis', fontsize=18, fontweight='bold', y=0.95, color='#2C3E50')
     
     plt.tight_layout()
     
