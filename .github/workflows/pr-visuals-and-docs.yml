@@ -159,6 +159,7 @@ jobs:
           echo "Analyzing documentation needs..."
           python .code-analysis/scripts/generate_concise_documentation_suggestions.py
         env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}
           # Azure AI Foundry configuration (optional - will fallback to rule-based if not set)

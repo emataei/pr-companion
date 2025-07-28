@@ -45,30 +45,6 @@ module.exports = async ({ github, context }) => {
 
 > **Note**: If images appear broken initially, GitHub Pages may still be deploying. Please wait a few minutes and refresh.
 
-<details>
-<summary>Troubleshooting - Click if images don't load</summary>
-
-**If images above don't load, try these steps:**
-
-1. **Wait and refresh**: GitHub Pages deployment can take 5-10 minutes
-2. **Check the main dashboard**: [Visual Dashboard](${visualUrls.urls.index}) (this usually works first)
-3. **Direct image links**:
-   - [PR Impact Grid](${visualUrls.urls.development_flow})
-
-**Common issues:**
-- **404 errors**: GitHub Pages might still be deploying
-- **Index works but images don't**: File copying issue during workflow
-- **All links broken**: GitHub Pages needs to be enabled in repo settings
-
-**Debug test**: [Test file](${visualUrls.base_url}/pr/${visualUrls.pr_number}/test.txt) (should show timestamp)
-
-**Repo setup needed?**
-- Go to Settings → Pages → Deploy from gh-pages branch
-- Wait 5-10 minutes for initial setup
-
-This comment will be updated once visuals are confirmed working.
-</details>
-
 ### PR Impact Grid
 Shows risk score, review time estimate, file change heatmap, and development intent.
 

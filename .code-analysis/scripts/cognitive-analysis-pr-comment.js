@@ -108,8 +108,8 @@ function buildCategorySection(results) {
   if (!categories) return '';
   
   let section = `### Complexity Breakdown\n`;
-  section += `| Category | Level |\n`;
-  section += `|----------|-------|\n`;
+  section += `| Category | Current | Scale |\n`;
+  section += `|----------|---------|-------|\n`;
   
   const categoryNames = {
     architectural: 'Architectural',
@@ -118,9 +118,12 @@ function buildCategorySection(results) {
     domain: 'Domain'
   };
   
+  // All possible levels for awareness
+  const possibleLevels = 'LOW → MEDIUM → HIGH → CRITICAL';
+  
   Object.entries(categories).forEach(([category, level]) => {
     const name = categoryNames[category] || capitalize(category);
-    section += `| ${name} | ${level} |\n`;
+    section += `| ${name} | **${level}** | ${possibleLevels} |\n`;
   });
   
   section += `\n`;

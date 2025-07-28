@@ -102,7 +102,10 @@ def determine_complexity_categories(pr_files, result):
 
 def get_complexity_level(score, thresholds):
     """Convert a score to complexity level."""
-    if score >= thresholds[1]:
+    # Add CRITICAL level for very high complexity
+    if score >= thresholds[1] * 2:  # Double the high threshold for critical
+        return 'CRITICAL'
+    elif score >= thresholds[1]:
         return 'HIGH'
     elif score >= thresholds[0]:
         return 'MEDIUM'

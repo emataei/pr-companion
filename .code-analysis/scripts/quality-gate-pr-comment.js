@@ -10,8 +10,8 @@ module.exports = async ({ github, context }) => {
   
   const results = loadResults('quality-gate-results.json', { 
     passed: false, 
-    score: 0, 
-    summary: 'Failed to load results' 
+    score: 1, // Minimum score of 1, not 0
+    summary: 'Failed to load quality gate results' 
   });
   
   const passed = results.passed;
@@ -32,8 +32,10 @@ module.exports = async ({ github, context }) => {
     comment += ` (Good)`;
   } else if (score >= 50) {
     comment += ` (Needs Improvement)`;
-  } else {
+  } else if (score > 0) {
     comment += ` (Significant Issues)`;
+  } else {
+    comment += ` (Critical Issues - Must Fix)`;
   }
   comment += `\n\n`;
   
@@ -71,12 +73,10 @@ module.exports = async ({ github, context }) => {
   
   // Next steps guidance (simplified)
   if (passed) {
-    comment += `### Status\n\n`;
     comment += `Quality gate passed. This PR is ready for cognitive complexity analysis.\n\n`;
     comment += `**For Reviewers:** Focus on business logic, architecture, and domain-specific concerns.\n`;
   } else {
-    comment += `### Status\n\n`;
-    comment += `Quality gate failed. Critical issues detected above.\n\n`;
+    comment += `Quality gate failed. Please address the critical issues above before proceeding.\n\n`;
     comment += `**Note:** Cognitive analysis will still run to provide complexity insights.\n`;
   }
   

@@ -167,6 +167,42 @@ class AIPreReviewBot:
         else:
             return "LOW", all_risk_factors
     
+    def _adjust_risk_with_cognitive_analysis(self, risk_level: str, risk_factors: List[str]) -> str:
+        """Adjust risk level based on cognitive complexity analysis results"""
+        try:
+            # Try to load cognitive analysis results
+            cognitive_path = Path('.code-analysis/outputs/cognitive-analysis-results.json')
+            if not cognitive_path.exists():
+                cognitive_path = Path('cognitive-analysis-results.json')
+            
+            if cognitive_path.exists():
+                with open(cognitive_path, 'r') as f:
+                    cognitive_results = json.load(f)
+                
+                cognitive_tier = cognitive_results.get('tier', 1)
+                cognitive_score = cognitive_results.get('total_score', 50)
+                
+                # If cognitive analysis shows very low complexity (tier 0, score < 25)
+                # and current risk is HIGH only due to keyword matching (not actual complex changes),
+                # downgrade to MEDIUM to avoid contradiction
+                if (cognitive_tier == 0 and cognitive_score < 25 and 
+                    risk_level == "HIGH"):
+                    
+                    # Check if HIGH risk is mainly from keyword detection, not structural complexity
+                    keyword_based_risks = [f for f in risk_factors if 'High-risk code change detected' in f]
+                    structural_risks = [f for f in risk_factors if 'High-risk file' in f and 'database' not in f.lower()]
+                    
+                    # If most risks are keyword-based and cognitive says it's simple, downgrade
+                    if len(keyword_based_risks) > len(structural_risks):
+                        print("Adjusting risk from HIGH to MEDIUM based on cognitive complexity analysis")
+                        print(f"Cognitive tier: {cognitive_tier}, score: {cognitive_score}")
+                        return "MEDIUM"
+                
+        except Exception as e:
+            print(f"Could not load cognitive analysis for risk adjustment: {e}")
+        
+        return risk_level
+
     def generate_ai_summary(self, diff: str, files: List[str]) -> Dict[str, str]:
         """Generate AI-powered summary of changes"""
         if not self.ai_client:
@@ -321,6 +357,9 @@ class AIPreReviewBot:
         
         # Assess risk level
         risk_level, risk_factors = self.assess_risk_level(files, diff)
+        
+        # Adjust risk level based on cognitive complexity (if available)
+        risk_level = self._adjust_risk_with_cognitive_analysis(risk_level, risk_factors)
         
         # Generate AI summary
         ai_analysis = self.generate_ai_summary(diff, files)

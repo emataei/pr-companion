@@ -12,15 +12,36 @@ from pathlib import Path
 def generate_concise_docs():
     """Generate a concise documentation comment"""
     
-    # Get changed files from environment
-    changed_files_str = os.getenv('CHANGED_FILES', '[]')
-    try:
-        changed_files = json.loads(changed_files_str)
-    except:
-        changed_files = []
+    # Get changed files from environment (try multiple sources)
+    changed_files_str = os.getenv('CHANGED_FILES', '')
+    if not changed_files_str:
+        changed_files_str = os.getenv('GITHUB_CHANGED_FILES', '')
+    
+    changed_files = []
+    if changed_files_str:
+        try:
+            # Try parsing as JSON first
+            changed_files = json.loads(changed_files_str)
+        except:
+            # If not JSON, try space-separated string
+            changed_files = changed_files_str.split()
+    
+    # Alternative: try reading from git diff if env vars not available
+    if not changed_files:
+        try:
+            import subprocess
+            result = subprocess.run(['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'], 
+                                  capture_output=True, text=True, cwd=os.getcwd())
+            if result.returncode == 0:
+                changed_files = [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
+        except:
+            pass
+    
+    # Debug output
+    print(f"DEBUG: Found {len(changed_files)} changed files: {changed_files}")
     
     if not changed_files:
-        return "## 📝 Documentation Update Suggestions\n\n✅ **No files changed** - no documentation updates needed.\n\n"
+        return "## Documentation Update Suggestions\n\n**No documentation updates needed** (unable to detect file changes)\n\n"
     
     # Simple file categorization
     config_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.yml', '.yaml', '.json', '.env', '.config'])]
@@ -31,28 +52,28 @@ def generate_concise_docs():
     
     # Add suggestions based on file types
     if config_files:
-        suggestions.append("📝 `docs/CONFIGURATION.md` - Configuration files modified")
+        suggestions.append("`docs/CONFIGURATION.md` - Configuration files modified")
     
     if component_files:
-        suggestions.append("📝 `docs/COMPONENTS.md` - UI components updated") 
+        suggestions.append("`docs/COMPONENTS.md` - UI components updated") 
         
     if api_files:
-        suggestions.append("📝 `docs/API.md` - API endpoints changed")
+        suggestions.append("`docs/API.md` - API endpoints changed")
     
     # Build concise output
-    content = "## 📝 Documentation Update Suggestions\n\n"
+    content = "## Documentation Update Suggestions\n\n"
     
     if not suggestions:
-        content += "✅ **No documentation updates needed**\n\n"
+        content += "**No documentation updates needed**\n\n"
     else:
-        content += f"💡 **{len(suggestions)} documentation updates recommended**\n\n"
+        content += f"**{len(suggestions)} documentation updates recommended**\n\n"
         for suggestion in suggestions:
-            content += f"{suggestion}\n"
+            content += f"- {suggestion}\n"
         content += "\n"
     
     # Quick summary
     file_count = len(changed_files)
-    content += f"📊 **{file_count} files changed** - Review if documentation needs updates.\n\n"
+    content += f"**{file_count} files changed** - Review if documentation needs updates.\n\n"
     
     return content
 
@@ -71,15 +92,15 @@ def main():
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        print(f"✅ Concise documentation suggestions written to {output_file}")
+        print(f"Concise documentation suggestions written to {output_file}")
         
     except Exception as e:
-        print(f"❌ Error generating documentation suggestions: {e}")
+        print(f"Error generating documentation suggestions: {e}")
         
         # Create fallback
-        fallback_content = """## 📝 Documentation Update Suggestions
+        fallback_content = """## Documentation Update Suggestions
 
-⚠️ **Unable to analyze changes** - Check if documentation needs updates manually.
+**Unable to analyze changes** - Check if documentation needs updates manually.
 
 """
         
