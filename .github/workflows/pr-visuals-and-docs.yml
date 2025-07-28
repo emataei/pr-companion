@@ -38,6 +38,11 @@ jobs:
         run: |
           mkdir -p .code-analysis/outputs
           mkdir -p .github/scripts
+          # Clear old outputs to ensure fresh generation
+          rm -f .code-analysis/outputs/*.png
+          rm -f .code-analysis/outputs/*.gif
+          rm -f .code-analysis/outputs/*.svg
+          echo "Created clean output directories"
 
       - name: Install dependencies
         run: |
@@ -146,9 +151,9 @@ jobs:
               REPORT_SIZE=$(wc -c < .code-analysis/outputs/enhanced_image_report.md)
               echo "Report size: $REPORT_SIZE characters"
               if [ "$REPORT_SIZE" -gt 60000 ]; then
-                echo "⚠️  Warning: Report size ($REPORT_SIZE chars) is near GitHub comment limit (65536 chars)"
+                echo "Warning: Report size ($REPORT_SIZE chars) is near GitHub comment limit (65536 chars)"
               else
-                echo "✅ Report size is within safe limits"
+                echo "Report size is within safe limits"
               fi
             fi
           else
@@ -182,6 +187,13 @@ jobs:
           # Create the gh-pages directory structure for this PR
           mkdir -p gh-pages/pr/${{ github.event.pull_request.number }}
           
+          # IMPORTANT: Remove old PR files first to force regeneration
+          echo "Removing old PR files to ensure fresh content..."
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.png
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.gif
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.svg
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+          
           # Copy all generated PNG and GIF files to gh-pages
           if [ -d ".code-analysis/outputs" ]; then
             echo "Copying visual files to gh-pages..."
@@ -193,25 +205,25 @@ jobs:
             # Copy PNG files
             if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
               cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "✅ Copied PNG files"
+              echo "Copied PNG files"
             else
-              echo "⚠️ No PNG files found"
+              echo "No PNG files found"
             fi
             
             # Copy GIF files  
             if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
               cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "✅ Copied GIF files"
+              echo "Copied GIF files"
             else
-              echo "⚠️ No GIF files found"
+              echo "No GIF files found"
             fi
             
             # Copy SVG files
             if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
               cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "✅ Copied SVG files"
+              echo "Copied SVG files"
             else
-              echo "⚠️ No SVG files found"
+              echo "No SVG files found"
             fi
             
             # List what we're deploying
@@ -237,9 +249,9 @@ jobs:
               fi
             done
             
-            # Create a simple test file to verify deployment
+            # Create a simple test file to verify deployment with timestamp
             echo "Creating test file for deployment verification..."
-            echo "This is a test file created at $(date)" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+            echo "This is a test file created at $(date) - Update: ${{ github.run_number }}" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
             echo "Test file created with content: $(cat gh-pages/pr/${{ github.event.pull_request.number }}/test.txt)"
             
             # Final verification before deployment
@@ -253,10 +265,10 @@ jobs:
             echo ""
             echo "Total files being deployed: $(find gh-pages -type f | wc -l)"
           else
-            echo "❌ No outputs directory found"
+            echo "No outputs directory found"
           fi
           
-          # Create an index.html for the PR
+          # Create an index.html for the PR with cache-busting
           cat > gh-pages/pr/${{ github.event.pull_request.number }}/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
@@ -267,23 +279,25 @@ jobs:
                   .visual { margin: 20px 0; text-align: center; }
                   img { max-width: 100%; height: auto; border: 1px solid #ddd; }
                   h1 { color: #333; }
+                  .timestamp { font-size: 12px; color: #666; margin-top: 20px; }
               </style>
           </head>
           <body>
               <h1>PR #${{ github.event.pull_request.number }} Visual Analysis</h1>
               <div class="visual">
                   <h2>PR Impact Grid</h2>
-                  <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>
-                  <img src="development_flow.png" alt="PR Impact Grid" />
+                  <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>   
+                  <img src="development_flow.png?v=${{ github.run_number }}" alt="PR Impact Grid" />
               </div>
               <div class="visual">
                   <h2>Story Arc</h2>
-                  <img src="story_arc.png" alt="Story Arc" />
+                  <img src="story_arc.png?v=${{ github.run_number }}" alt="Story Arc" />
               </div>
               <div class="visual">
                   <h2>PR Dependencies</h2>
-                  <img src="dependency_graph_pr.png" alt="PR Dependency Graph" />
+                  <img src="dependency_graph_pr.png?v=${{ github.run_number }}" alt="PR Dependency Graph" />
               </div>
+              <div class="timestamp">Last updated: $(date) - Run #${{ github.run_number }}</div>
           </body>
           </html>
           EOF
@@ -306,18 +320,18 @@ jobs:
           
           # Check if the main index.html exists
           if [ -f "gh-pages/index.html" ]; then
-            echo "✅ Main index.html exists"
+            echo "Main index.html exists"
             echo "Main index.html size: $(wc -c < gh-pages/index.html) bytes"
           else
-            echo "❌ Main index.html missing"
+            echo "Main index.html missing"
           fi
           
           # Check if PR index.html exists
           if [ -f "gh-pages/pr/${{ github.event.pull_request.number }}/index.html" ]; then
-            echo "✅ PR index.html exists"
+            echo "PR index.html exists"
             echo "PR index.html size: $(wc -c < gh-pages/pr/${{ github.event.pull_request.number }}/index.html) bytes"
           else
-            echo "❌ PR index.html missing"
+            echo "PR index.html missing"
           fi
 
       - name: Deploy to GitHub Pages
@@ -337,12 +351,12 @@ jobs:
       - name: Verify deployment
         if: github.event_name == 'pull_request'
         run: |
-          echo "✅ GitHub Pages deployment completed"
-          echo "🔗 Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          echo "📊 PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          echo "GitHub Pages deployment completed"
+          echo "Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
           echo ""
-          echo "⏳ Note: GitHub Pages may take 5-10 minutes to update after deployment"
-          echo "🔄 If links don't work immediately, please wait and try again"
+          echo "Note: GitHub Pages may take 5-10 minutes to update after deployment"
+          echo "If links don't work immediately, please wait and try again"
           
           # Test if files are accessible (this will help debug)
           echo ""
@@ -360,7 +374,7 @@ jobs:
           echo "  Test file URL: ${BASE_URL}/pr/${PR_NUM}/test.txt"
           
           echo ""
-          echo "🔧 TROUBLESHOOTING TIPS:"
+          echo "TROUBLESHOOTING TIPS:"
           echo "1. If you see '404 - File not found' errors:"
           echo "   - Check that GitHub Pages is enabled in repo Settings → Pages"
           echo "   - Make sure 'Deploy from gh-pages branch' is selected"
