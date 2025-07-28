@@ -102,6 +102,12 @@ function buildComment(results) {
     comment += impactSection;
   }
 
+  // Smart recommendations (context-aware)
+  const recommendationsSection = buildRecommendationsSection();
+  if (recommendationsSection) {
+    comment += recommendationsSection;
+  }
+
   // Footer
   comment += `---\n*AI pre-review analysis • Priority: First reviewer focus*`;
 
@@ -307,4 +313,29 @@ function buildConfidenceSection(results) {
   // Removed detailed confidence section to keep comment concise
   // Confidence is already shown in header
   return '';
+}
+
+function buildRecommendationsSection() {
+  try {
+    // Load smart recommendations if available
+    const recommendationsResults = loadResults('smart_recommendations.md', null);
+    if (recommendationsResults && typeof recommendationsResults === 'string') {
+      return recommendationsResults;
+    }
+    
+    // Try reading the file directly if loadResults doesn't work for .md files
+    const fs = require('fs');
+    const path = require('path');
+    const recommendationsPath = path.join('.code-analysis', 'outputs', 'smart_recommendations.md');
+    
+    if (fs.existsSync(recommendationsPath)) {
+      const content = fs.readFileSync(recommendationsPath, 'utf-8');
+      return content + '\n';
+    }
+    
+    return ''; // No recommendations available
+  } catch (error) {
+    console.log('Could not load smart recommendations:', error.message);
+    return '';
+  }
 }
