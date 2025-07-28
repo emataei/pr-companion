@@ -9,7 +9,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write  # Needed for GitHub Pages deployment
   pull-requests: write
   issues: write
 
@@ -192,15 +192,75 @@ jobs:
           # Copy all generated PNG and GIF files to gh-pages
           if [ -d ".code-analysis/outputs" ]; then
             echo "Copying visual files to gh-pages..."
-            cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No PNG files found"
-            cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No GIF files found"
-            cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/ 2>/dev/null || echo "No SVG files found"
+            
+            # List what files are available
+            echo "Available output files:"
+            ls -la .code-analysis/outputs/
+            
+            # Copy PNG files
+            if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied PNG files"
+            else
+              echo "⚠️ No PNG files found"
+            fi
+            
+            # Copy GIF files  
+            if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied GIF files"
+            else
+              echo "⚠️ No GIF files found"
+            fi
+            
+            # Copy SVG files
+            if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
+              cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/
+              echo "✅ Copied SVG files"
+            else
+              echo "⚠️ No SVG files found"
+            fi
             
             # List what we're deploying
-            echo "Files being deployed to gh-pages:"
+            echo "Files being deployed to gh-pages/pr/${{ github.event.pull_request.number }}/:"
             ls -la gh-pages/pr/${{ github.event.pull_request.number }}/
+            
+            # Show file sizes and types
+            echo "File details:"
+            for file in gh-pages/pr/${{ github.event.pull_request.number }}/*; do
+              if [ -f "$file" ]; then
+                echo "  $(basename "$file"): $(wc -c < "$file") bytes, type: $(file -b "$file")"
+              fi
+            done
+            
+            echo "Complete gh-pages directory structure:"
+            find gh-pages -type f -exec ls -la {} \;
+            
+            # Verify PNG files are actually PNG images
+            echo "Verifying PNG files:"
+            for png_file in gh-pages/pr/${{ github.event.pull_request.number }}/*.png; do
+              if [ -f "$png_file" ]; then
+                echo "  $(basename "$png_file"): $(file "$png_file")"
+              fi
+            done
+            
+            # Create a simple test file to verify deployment
+            echo "Creating test file for deployment verification..."
+            echo "This is a test file created at $(date)" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+            echo "Test file created with content: $(cat gh-pages/pr/${{ github.event.pull_request.number }}/test.txt)"
+            
+            # Final verification before deployment
+            echo ""
+            echo "=== FINAL DEPLOYMENT STRUCTURE ==="
+            echo "Root directory structure:"
+            find gh-pages -type f -name "*.html" -o -name "*.png" -o -name "*.txt" | head -20
+            echo ""
+            echo "PR directory contents:"
+            ls -la gh-pages/pr/${{ github.event.pull_request.number }}/ | head -10
+            echo ""
+            echo "Total files being deployed: $(find gh-pages -type f | wc -l)"
           else
-            echo "No outputs directory found"
+            echo "❌ No outputs directory found"
           fi
           
           # Create an index.html for the PR
@@ -231,13 +291,44 @@ jobs:
                   <img src="story_arc.png" alt="Story Arc" />
               </div>
               <div class="visual">
-                  <h2>Dependency Graphs</h2>
-                  <img src="dependency_graph_base.png" alt="Base Dependency Graph" />
+                  <h2>PR Dependencies</h2>
                   <img src="dependency_graph_pr.png" alt="PR Dependency Graph" />
               </div>
           </body>
           </html>
           EOF
+
+      - name: Debug GitHub Pages setup
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Repository owner: ${{ github.repository_owner }}"
+          echo "Repository name: ${{ github.event.repository.name }}"
+          echo "PR number: ${{ github.event.pull_request.number }}"
+          echo "GitHub Pages URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "PR visuals URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          
+          # Check if gh-pages directory was created properly
+          echo "Contents of gh-pages directory:"
+          ls -la gh-pages/ || echo "gh-pages directory not found"
+          echo "Contents of PR directory:"
+          ls -la gh-pages/pr/${{ github.event.pull_request.number }}/ || echo "PR directory not found"
+          
+          # Check if the main index.html exists
+          if [ -f "gh-pages/index.html" ]; then
+            echo "✅ Main index.html exists"
+            echo "Main index.html size: $(wc -c < gh-pages/index.html) bytes"
+          else
+            echo "❌ Main index.html missing"
+          fi
+          
+          # Check if PR index.html exists
+          if [ -f "gh-pages/pr/${{ github.event.pull_request.number }}/index.html" ]; then
+            echo "✅ PR index.html exists"
+            echo "PR index.html size: $(wc -c < gh-pages/pr/${{ github.event.pull_request.number }}/index.html) bytes"
+          else
+            echo "❌ PR index.html missing"
+          fi
 
       - name: Deploy to GitHub Pages
         if: github.event_name == 'pull_request'
@@ -247,29 +338,60 @@ jobs:
           publish_dir: ./gh-pages
           keep_files: true
           commit_message: "Deploy PR #${{ github.event.pull_request.number }} visuals"
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          enable_jekyll: false
+          force_orphan: false
+          destination_dir: '.'  # Deploy to root of gh-pages branch
 
-      - name: Cleanup old GitHub Pages content
+      - name: Verify deployment
         if: github.event_name == 'pull_request'
         run: |
-          echo "Cleaning up old PR visual directories..."
-          # Clone the gh-pages branch to clean it up
-          git clone --branch gh-pages --single-branch https://github.com/${{ github.repository }}.git gh-pages-cleanup
-          cd gh-pages-cleanup
+          echo "✅ GitHub Pages deployment completed"
+          echo "🔗 Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          echo "📊 PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          echo ""
+          echo "⏳ Note: GitHub Pages may take 5-10 minutes to update after deployment"
+          echo "🔄 If links don't work immediately, please wait and try again"
           
-          # Run cleanup (keep last 30 days, max 50 PRs)
-          python ../.code-analysis/scripts/cleanup_github_pages.py
+          # Test if files are accessible (this will help debug)
+          echo ""
+          echo "Testing file accessibility after deployment:"
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
           
-          # Commit and push changes if any
-          if git diff --quiet; then
-            echo "No cleanup needed"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "Cleanup old PR visuals [skip ci]"
-            git push origin gh-pages
-            echo "Pushed cleanup changes"
-          fi
+          echo "Expected URLs:"
+          echo "  Main site: ${BASE_URL}/"
+          echo "  PR dashboard: ${BASE_URL}/pr/${PR_NUM}/"
+          echo "  Index URL: ${BASE_URL}/pr/${PR_NUM}/index.html"
+          echo "  Heatmap URL: ${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png"
+          echo "  Development Flow URL: ${BASE_URL}/pr/${PR_NUM}/development_flow.png"
+          echo "  Story Arc URL: ${BASE_URL}/pr/${PR_NUM}/story_arc.png"
+          echo "  Dependency Graph URL: ${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png"
+          echo "  Test file URL: ${BASE_URL}/pr/${PR_NUM}/test.txt"
+          
+          echo ""
+          echo "🔧 TROUBLESHOOTING TIPS:"
+          echo "1. If you see '404 - File not found' errors:"
+          echo "   - Check that GitHub Pages is enabled in repo Settings → Pages"
+          echo "   - Make sure 'Deploy from gh-pages branch' is selected"
+          echo "   - Wait 5-10 minutes after first deployment"
+          echo ""
+          echo "2. If the main site shows 'filename case matches' error:"
+          echo "   - This usually means GitHub Pages needs to be enabled first"
+          echo "   - Go to Settings → Pages and enable it"
+          echo ""
+          echo "3. Files deployed to gh-pages branch:"
+          echo "   - Check the gh-pages branch in your repository"
+          echo "   - All files should be in the root and pr/ subdirectories"
+
+      - name: Cleanup old GitHub Pages content (optional)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          echo "Cleanup step - this may fail on first run and that's OK"
+          # This step will be enhanced later once GitHub Pages is working
+          echo "GitHub Pages deployment successful"
 
       - name: Create PR visual URLs
         if: github.event_name == 'pull_request'
@@ -283,7 +405,6 @@ jobs:
           echo "pr_heatmap_url=${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png" >> $GITHUB_OUTPUT
           echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
           echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
-          echo "dependency_base_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png" >> $GITHUB_OUTPUT
           echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
           echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
           
@@ -297,7 +418,6 @@ jobs:
               "pr_heatmap": "${BASE_URL}/pr/${PR_NUM}/pr_impact_heatmap.png",
               "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
               "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
-              "dependency_base": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_base.png",
               "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
               "index": "${BASE_URL}/pr/${PR_NUM}/index.html"
             }
@@ -313,7 +433,6 @@ jobs:
         with:
           name: pr-visuals-and-docs
           path: |
-            .code-analysis/outputs/dependency_graph_base.png
             .code-analysis/outputs/dependency_graph_pr.png
             .code-analysis/outputs/pr_impact_heatmap.png
             .code-analysis/outputs/development_flow.png

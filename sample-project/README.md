@@ -14,19 +14,40 @@ This is a sample Next.js + TypeScript project designed to test the code quality 
 ## API Endpoints
 
 ### Health Check
-- `GET /api/health` - Returns comprehensive system status
+- `GET /api/health` - Returns comprehensive system status with enhanced monitoring
 - Response includes: status, timestamp, version, uptime, environment, memory usage, service status
 - Enhanced monitoring with memory statistics and service health checks
+- Added random service health simulation for testing
 
 ### User Management  
-- `GET /api/users` - List all users with pagination
-- `GET /api/users/[id]` - Get specific user details with preferences
-- `PUT /api/users/[id]` - Update user information and settings
-- New: User preferences support (theme, notifications, language)
+- `GET /api/users` - List all users with pagination and filtering support
+- `GET /api/users/[id]` - Get specific user details with preferences and settings
+- `PUT /api/users/[id]` - Update user information and settings with validation
+- `GET /api/users/[id]/settings` - Get user preferences (theme, notifications, language)
+- `PUT /api/users/[id]/settings` - Update user preferences with validation
+- Enhanced user preferences support with accessibility options
 
-## Purpose
+## Getting Started
 
-This project contains intentional code quality issues to demonstrate:
+To run this sample project locally:
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Open browser to http://localhost:3000
+```
+
+## Testing the PR Companion
+
+This project is designed to showcase the PR Companion's visual analysis capabilities:
+- Make changes to components in `src/components/`
+- Create a Pull Request
+- Watch as the PR Companion generates visual analysis automatically
+- View the results on GitHub Pages at: https://emataei.github.io/pr-companion/
 
 - **Security Issues**: Hardcoded secrets, SQL injection vulnerabilities
 - **Type Safety Issues**: Missing TypeScript annotations, `any` types
