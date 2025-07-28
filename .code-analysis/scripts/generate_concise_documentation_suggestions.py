@@ -1,18 +1,87 @@
 #!/usr/bin/env python3
 """
-Generate Concise Documentation Suggestions
-Much shorter and to-the-point format
+Generate Context-Aware Documentation Suggestions
+Analyzes actual diff content to provide meaningful suggestions
 """
 
 import os
 import sys
 import json
+import re
+import subprocess
 from pathlib import Path
 
-def generate_concise_docs():
-    """Generate a concise documentation comment"""
+def get_diff_context():
+    """Get detailed diff information for context-aware analysis"""
+    try:
+        # Get the actual diff content
+        result = subprocess.run(['git', 'diff', '--unified=3', 'HEAD~1', 'HEAD'], 
+                              capture_output=True, text=True, cwd=os.getcwd())
+        if result.returncode == 0:
+            return result.stdout
+    except (subprocess.SubprocessError, FileNotFoundError):
+        pass
+    return ""
+
+def analyze_api_changes(diff_content):
+    """Analyze for new public APIs or interfaces"""
+    suggestions = []
+    if re.search(r'\+.*(?:export|public).*(?:interface|class|function|const).*\{', diff_content, re.MULTILINE):
+        api_matches = re.findall(r'\+.*(?:export|public).*(?:interface|class|function|const)\s+(\w+)', diff_content)
+        if api_matches:
+            suggestions.append(f"`docs/API.md` - New public APIs added: {', '.join(set(api_matches[:3]))}")
+    return suggestions
+
+def analyze_config_changes(diff_content):
+    """Analyze for meaningful configuration changes"""
+    suggestions = []
+    config_changes = re.findall(r'\+\s*["\']?(\w+)["\']?\s*:\s*["\']?([^,\n}]+)["\']?', diff_content)
+    significant_config = [c for c in config_changes if not c[0].startswith('_') and len(c[1]) > 2]
+    if significant_config and len(significant_config) >= 2:
+        config_keys = [c[0] for c in significant_config[:3]]
+        suggestions.append(f"`docs/CONFIGURATION.md` - New config options: {', '.join(config_keys)}")
+    return suggestions
+
+def analyze_breaking_changes(diff_content):
+    """Analyze for breaking changes"""
+    suggestions = []
+    if re.search(r'^-.*(?:export|public).*(?:function|class|const)', diff_content, re.MULTILINE):
+        suggestions.append("`docs/BREAKING_CHANGES.md` - Removed public APIs detected")
+    return suggestions
+
+def analyze_diff_content(diff_content):
+    """Analyze diff content for meaningful changes that require documentation"""
+    if not diff_content:
+        return []
     
-    # Get changed files from environment (try multiple sources)
+    suggestions = []
+    
+    # Combine all analysis functions
+    suggestions.extend(analyze_api_changes(diff_content))
+    suggestions.extend(analyze_config_changes(diff_content))
+    suggestions.extend(analyze_breaking_changes(diff_content))
+    
+    # Database/Schema changes
+    if re.search(r'\+.*(?:CREATE TABLE|ALTER TABLE|ADD COLUMN|DROP COLUMN)', diff_content, re.IGNORECASE):
+        suggestions.append("`docs/DATABASE.md` - Database schema changes detected")
+    
+    # Environment variable changes
+    env_vars = re.findall(r'\+.*(?:process\.env\.|getenv\(|ENV\[)["\'](\w+)["\']', diff_content)
+    if env_vars:
+        suggestions.append(f"`docs/SETUP.md` - New environment variables: {', '.join(set(env_vars[:3]))}")
+    
+    # New dependencies
+    if '"dependencies"' in diff_content or '"devDependencies"' in diff_content:
+        new_deps = re.findall(r'\+\s*"([^"]+)":\s*"[^"]+"', diff_content)
+        if new_deps:
+            suggestions.append(f"`docs/DEPENDENCIES.md` - New dependencies: {', '.join(new_deps[:3])}")
+    
+    return suggestions
+
+def generate_concise_docs():
+    """Generate context-aware documentation suggestions"""
+    
+    # Get changed files for basic info
     changed_files_str = os.getenv('CHANGED_FILES', '')
     if not changed_files_str:
         changed_files_str = os.getenv('GITHUB_CHANGED_FILES', '')
@@ -20,60 +89,53 @@ def generate_concise_docs():
     changed_files = []
     if changed_files_str:
         try:
-            # Try parsing as JSON first
             changed_files = json.loads(changed_files_str)
-        except:
-            # If not JSON, try space-separated string
+        except (json.JSONDecodeError, TypeError):
             changed_files = changed_files_str.split()
     
-    # Alternative: try reading from git diff if env vars not available
+    # Fallback to git diff for file list
     if not changed_files:
         try:
-            import subprocess
             result = subprocess.run(['git', 'diff', '--name-only', 'HEAD~1', 'HEAD'], 
                                   capture_output=True, text=True, cwd=os.getcwd())
             if result.returncode == 0:
                 changed_files = [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
-        except:
+        except (subprocess.SubprocessError, FileNotFoundError):
             pass
     
-    # Debug output (can be removed in production)
-    # print(f"DEBUG: Found {len(changed_files)} changed files: {changed_files}")
-    
     if not changed_files:
-        return "## Documentation Update Suggestions\n\n**No documentation updates needed** (unable to detect file changes)\n\n"
+        return "## Documentation Update Suggestions\n\n**No documentation updates needed** - No file changes detected.\n\n"
     
-    # Simple file categorization
-    config_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.yml', '.yaml', '.json', '.env', '.config'])]
-    component_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.tsx', '.jsx', '.vue', '.component.ts'])]
-    api_files = [f for f in changed_files if 'api/' in f or 'routes/' in f]
+    # Get diff content for context analysis
+    diff_content = get_diff_context()
     
-    suggestions = []
+    # Analyze diff for meaningful changes
+    suggestions = analyze_diff_content(diff_content)
     
-    # Add suggestions based on file types
-    if config_files:
-        suggestions.append("`docs/CONFIGURATION.md` - Configuration files modified")
-    
-    if component_files:
-        suggestions.append("`docs/COMPONENTS.md` - UI components updated") 
-        
-    if api_files:
-        suggestions.append("`docs/API.md` - API endpoints changed")
-    
-    # Build concise output
+    # Build output
     content = "## Documentation Update Suggestions\n\n"
     
     if not suggestions:
-        content += "**No documentation updates needed**\n\n"
+        # Only show this if there are actual code files (not just docs/config touched)
+        code_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs', '.cpp', '.c'])]
+        if code_files:
+            content += "**No documentation updates needed** - Changes appear to be internal implementation details.\n\n"
+        else:
+            content += "**No documentation updates needed** - Only non-code files modified.\n\n"
     else:
         content += f"**{len(suggestions)} documentation updates recommended**\n\n"
         for suggestion in suggestions:
             content += f"- {suggestion}\n"
         content += "\n"
     
-    # Quick summary
+    # Contextual summary
     file_count = len(changed_files)
-    content += f"**{file_count} files changed** - Review if documentation needs updates.\n\n"
+    code_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs'])]
+    
+    if code_files:
+        content += f"**{file_count} files changed** ({len(code_files)} code files) - Analyzed diff content for documentation impact.\n\n"
+    else:
+        content += f"**{file_count} files changed** (config/docs only) - No API documentation impact expected.\n\n"
     
     return content
 
@@ -81,7 +143,7 @@ def main():
     """Main function"""
     try:
         # Ensure output directory exists
-        output_dir = Path('.code-analysis/outputs')
+        output_dir = Path(__file__).parent.parent / 'outputs'  # .code-analysis/outputs
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate concise documentation suggestions
@@ -97,14 +159,14 @@ def main():
     except Exception as e:
         print(f"Error generating documentation suggestions: {e}")
         
-        # Create fallback
+        # Create fallback content
         fallback_content = """## Documentation Update Suggestions
 
 **Unable to analyze changes** - Check if documentation needs updates manually.
 
 """
         
-        output_file = Path('.code-analysis/outputs/documentation_suggestions.md')
+        output_file = Path(__file__).parent.parent / 'outputs' / 'documentation_suggestions.md'
         output_file.parent.mkdir(parents=True, exist_ok=True)
         
         with open(output_file, 'w', encoding='utf-8') as f:

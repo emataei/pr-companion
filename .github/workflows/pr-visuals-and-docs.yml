@@ -161,7 +161,7 @@ jobs:
       - name: Generate documentation suggestions
         run: |
           echo "Analyzing documentation needs..."
-          python .code-analysis/scripts/generate_concise_documentation_suggestions.py
+          python .code-analysis/scripts/generate_smart_documentation_suggestions.py
         env:
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
           GITHUB_BASE_REF: ${{ github.base_ref }}

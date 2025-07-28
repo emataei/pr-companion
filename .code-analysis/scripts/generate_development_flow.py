@@ -24,16 +24,13 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
 # Constants
-OUTPUT_DIR_RELATIVE = '.code-analysis/outputs'  # When running from repo root
-OUTPUT_DIR_PARENT = '../outputs'  # When running from .code-analysis/scripts
-OUTPUT_DIR_GRANDPARENT = '../../.code-analysis/outputs'  # For other directory structures
+OUTPUT_DIR = Path(__file__).parent.parent / 'outputs'  # Always .code-analysis/outputs
 
 
 def save_image_with_base64(fig, base_filename, title="Development Flow"):
     """Save image as PNG and create base64 + markdown files"""
-    # Force the correct output directory
-    # Since we know we're running from .code-analysis/scripts, use a direct path
-    output_dir = Path("../outputs")
+    # Use the standardized output directory
+    output_dir = OUTPUT_DIR
     
     # Create the directory if it doesn't exist
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -333,8 +330,7 @@ def analyze_change_intent():
 def load_diff_stats():
     """Load and parse git diff statistics"""
     possible_paths = [
-        Path(OUTPUT_DIR_RELATIVE + '/diff_stats.txt'),
-        Path('../outputs/diff_stats.txt'),
+        OUTPUT_DIR / 'diff_stats.txt',
         Path('outputs/diff_stats.txt'),
     ]
     
@@ -348,8 +344,7 @@ def load_diff_stats():
         # Try to generate diff stats automatically
         print("Diff stats file not found, attempting to generate...")
         try:
-            output_dir = Path(OUTPUT_DIR_RELATIVE)
-            output_dir.mkdir(parents=True, exist_ok=True)
+            OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             
             # Generate diff stats by comparing to main/master branch
             for base_branch in ['origin/main', 'origin/master', 'main', 'master']:
@@ -361,7 +356,7 @@ def load_diff_stats():
                         timeout=10
                     )
                     if result.returncode == 0 and result.stdout.strip():
-                        diff_file = output_dir / 'diff_stats.txt'
+                        diff_file = OUTPUT_DIR / 'diff_stats.txt'
                         with open(diff_file, 'w') as f:
                             f.write(result.stdout)
                         print(f"Generated diff stats using {base_branch}")
@@ -474,10 +469,8 @@ def load_enhanced_analysis_data():
     try:
         # Try multiple possible locations for the enhanced analysis file
         possible_paths = [
-            Path('.code-analysis/outputs/pr_impact_analysis_v2.json'),
-            Path('../outputs/pr_impact_analysis_v2.json'),
+            OUTPUT_DIR / 'pr_impact_analysis_v2.json',
             Path('outputs/pr_impact_analysis_v2.json'),
-            Path('.code-analysis/scripts/.code-analysis/outputs/pr_impact_analysis_v2.json')
         ]
         
         for enhanced_file in possible_paths:
@@ -781,17 +774,12 @@ def create_no_data_visual():
 
 def create_placeholder():
     """Create text placeholder when matplotlib unavailable"""
-    # Force the correct output directory
-    output_dir = Path("../outputs")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Use the standardized output directory
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    print(f"Creating placeholder in: {output_dir.absolute()}")
+    print(f"Creating placeholder in: {OUTPUT_DIR.absolute()}")
     
-    if not output_dir:
-        output_dir = Path(OUTPUT_DIR_RELATIVE)
-        output_dir.mkdir(parents=True, exist_ok=True)
-    
-    output_file = output_dir / 'development_flow_placeholder.md'
+    output_file = OUTPUT_DIR / 'development_flow_placeholder.md'
     
     with open(output_file, 'w') as f:
         f.write("# PR Impact Analysis\n\n")
@@ -807,10 +795,9 @@ def main():
     print("Generating PR impact grid...")
     
     # Ensure output directory exists
-    output_dir = Path("../outputs")
     try:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        print(f"Using output directory: {output_dir.absolute()}")
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"Using output directory: {OUTPUT_DIR.absolute()}")
     except Exception as e:
         print(f"Error creating output directory: {e}")
     
