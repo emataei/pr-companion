@@ -1,23 +1,6 @@
 /**
  * PR Comment Script with GitHub Pages Hosted Images
- * Posts PR analysis with p**Common issues:**
-- **"filename case matches" error**: GitHub Pages not enabled yet
-- **404 errors**: GitHub Pages might still be deploying  
-- **Index works but images don't**: File copying issue during workflow
-- **All links broken**: GitHub Pages setup needed
-
-**Debug test**: [Test file](${visualUrls.base_url}/pr/${visualUrls.pr_number}/test.txt) (should show timestamp)
-
-**GitHub Pages setup needed?**
-1. Go to **Settings → Pages** in this repository
-2. Under "Source", select **"Deploy from a branch"**
-3. Choose **"gh-pages"** branch and **"/ (root)"** folder
-4. Click **Save** and wait 5-10 minutes for deployment
-
-**Still not working?**
-- Check the [gh-pages branch](../../tree/gh-pages) to see if files were deployed
-- Wait up to 10 minutes after first setup for DNS propagation
-- Try the [main site](${visualUrls.base_url}/) first to see if GitHub Pages is workingsted image URLs
+ * Posts PR analysis with hosted image URLs
  */
 
 const fs = require('fs');
@@ -47,7 +30,6 @@ module.exports = async ({ github, context }) => {
         base_url: baseUrl,
         pr_number: prNumber,
         urls: {
-          pr_heatmap: `${baseUrl}/pr/${prNumber}/pr_impact_heatmap.png`,
           development_flow: `${baseUrl}/pr/${prNumber}/development_flow.png`,
           story_arc: `${baseUrl}/pr/${prNumber}/story_arc.png`,
           dependency_pr: `${baseUrl}/pr/${prNumber}/dependency_graph_pr.png`,
@@ -83,11 +65,6 @@ module.exports = async ({ github, context }) => {
 
 > **Note**: If images appear broken initially, GitHub Pages may still be deploying. Please wait a few minutes and refresh.
 
-### PR Impact Heatmap
-Shows the areas of the codebase most affected by this PR.
-
-![PR Impact Heatmap](${visualUrls.urls.pr_heatmap})
-
 <details>
 <summary>Troubleshooting - Click if images don't load</summary>
 
@@ -96,8 +73,7 @@ Shows the areas of the codebase most affected by this PR.
 1. **Wait and refresh**: GitHub Pages deployment can take 5-10 minutes
 2. **Check the main dashboard**: [Visual Dashboard](${visualUrls.urls.index}) (this usually works first)
 3. **Direct image links**:
-   - [PR Impact Heatmap](${visualUrls.urls.pr_heatmap})
-   - [Development Flow](${visualUrls.urls.development_flow})
+   - [PR Impact Grid](${visualUrls.urls.development_flow})
    - [Story Arc](${visualUrls.urls.story_arc})
    - [Dependency Graph](${visualUrls.urls.dependency_pr})
 
@@ -115,10 +91,10 @@ Shows the areas of the codebase most affected by this PR.
 This comment will be updated once visuals are confirmed working.
 </details>
 
-### Development Flow
-Visualizes the development progression and change patterns.
+### PR Impact Grid
+Shows risk score, review time estimate, file change heatmap, and development intent.
 
-![Development Flow](${visualUrls.urls.development_flow})
+![PR Impact Grid](${visualUrls.urls.development_flow})
 
 ### Story Arc Analysis
 Shows the evolution and complexity changes over time.
@@ -214,9 +190,9 @@ Visual analysis is being generated and deployed to GitHub Pages.
 
 **Expected URLs:**
 - [Visual Dashboard](${visualUrls.urls.index})
-- [PR Impact Heatmap](${visualUrls.urls.pr_heatmap})
-- [Development Flow](${visualUrls.urls.development_flow})
+- [PR Impact Grid](${visualUrls.urls.development_flow})
 - [Story Arc](${visualUrls.urls.story_arc})
+- [Dependency Graph](${visualUrls.urls.dependency_pr})
 
 **If this is the first PR:**
 1. GitHub Pages may need to be enabled in repository settings

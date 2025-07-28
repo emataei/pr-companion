@@ -162,14 +162,6 @@ jobs:
             const script = require('./.code-analysis/scripts/intent-classification-pr-comment.js');
             return await script({ github, context });
 
-      - name: Post Impact Prediction Comment (4th)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const script = require('./.code-analysis/scripts/impact-prediction-pr-comment.js');
-            return await script({ github, context });
-
       - name: Update PR Description with Semantic Story
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7

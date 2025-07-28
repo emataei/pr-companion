@@ -131,16 +131,6 @@ jobs:
             const script = require('./.code-analysis/scripts/quality-gate-pr-comment.js');
             return await script({ github, context });
 
-      - name: Post Dependency Graph Comment (2nd)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        env:
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        with:
-          script: |
-            const script = require('./.code-analysis/scripts/dependency-graph-pr-comment.js');
-            return await script({ github, context });
-
       - name: Auto-label PR based on quality analysis
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7

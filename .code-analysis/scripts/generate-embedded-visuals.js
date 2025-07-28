@@ -102,8 +102,7 @@ async function generateEnhancedImageReport() {
   
   // Define images with their locations (check root first, then outputs)
   const images = {
-    'pr_impact_heatmap.png': 'PR Impact Heatmap',
-    'development_flow.png': 'Development Flow',
+    'development_flow.png': 'PR Impact Grid',
     'story_arc.png': 'PR Summary',
     'dependency_graph_pr.png': 'PR Dependencies'
   };

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Generate Optimized Development Flow Visualization
-Clean, focused visual showing PR development timeline
+Generate PR Impact Grid Visualization
+Focused visual showing risk score, file changes, and actionable insights
 """
 
 import json
@@ -12,28 +12,35 @@ from io import BytesIO
 from pathlib import Path
 import subprocess
 from datetime import datetime
+import re
 
 try:
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     import numpy as np
+    from matplotlib.gridspec import GridSpec
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
+
+# Constants
+OUTPUT_DIR_RELATIVE = '.code-analysis/outputs'
+OUTPUT_DIR_PARENT = '../.code-analysis/outputs'
+OUTPUT_DIR_GRANDPARENT = '../../.code-analysis/outputs'
 
 
 def save_image_with_base64(fig, base_filename, title="Development Flow"):
     """Save image as PNG and create base64 + markdown files"""
     # Find the output directory dynamically
     output_dir = None
-    for check_dir in ['.code-analysis/outputs', '../.code-analysis/outputs', '../../.code-analysis/outputs']:
+    for check_dir in [OUTPUT_DIR_RELATIVE, OUTPUT_DIR_PARENT, OUTPUT_DIR_GRANDPARENT]:
         if Path(check_dir).exists() or Path(check_dir).parent.exists():
             output_dir = Path(check_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
             break
     
     if not output_dir:
-        output_dir = Path('.code-analysis/outputs')
+        output_dir = Path(OUTPUT_DIR_RELATIVE)
         output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save PNG file with size optimization
@@ -123,315 +130,491 @@ def save_image_with_base64(fig, base_filename, title="Development Flow"):
     return png_path, base64_path, markdown_path
 
 
-def classify_commit_purpose(message, files_changed=0):
-    """Classify commit purpose based on message and changes"""
-    message_lower = message.lower()
-    
-    # Define purpose patterns (order matters - more specific first)
-    purpose_patterns = {
-        'setup': {
-            'keywords': ['initial', 'setup', 'init', 'scaffold', 'bootstrap', 'create project', 'dependencies', 'config'],
-            'color': '#9B59B6',
-            'icon': 'SET',
-            'label': 'Setup/Config'
-        },
-        'feature': {
-            'keywords': ['add', 'implement', 'create', 'new', 'feature', 'introduce', 'build'],
-            'color': '#3498DB', 
-            'icon': 'NEW',
-            'label': 'Features'
-        },
-        'fix': {
-            'keywords': ['fix', 'bug', 'error', 'issue', 'resolve', 'correct', 'patch'],
-            'color': '#E74C3C',
-            'icon': 'FIX', 
-            'label': 'Bug Fixes'
-        },
-        'refactor': {
-            'keywords': ['refactor', 'cleanup', 'reorganize', 'restructure', 'improve', 'optimize', 'clean'],
-            'color': '#F39C12',
-            'icon': 'REF',
-            'label': 'Refactoring'
-        },
-        'docs': {
-            'keywords': ['doc', 'readme', 'comment', 'documentation', 'guide', 'example'],
-            'color': '#2ECC71',
-            'icon': 'DOC',
-            'label': 'Documentation'
-        },
-        'test': {
-            'keywords': ['test', 'spec', 'unit', 'integration', 'coverage'],
-            'color': '#1ABC9C',
-            'icon': 'TST',  
-            'label': 'Testing'
-        },
-        'style': {
-            'keywords': ['style', 'format', 'lint', 'prettier', 'css', 'ui'],
-            'color': '#E67E22',
-            'icon': 'STY',
-            'label': 'Styling'
-        },
-        'merge': {
-            'keywords': ['merge', 'pull request', 'pr'],
-            'color': '#95A5A6',
-            'icon': 'MRG',
-            'label': 'Merges'
-        }
-    }
-    
-    # Check for purpose based on keywords
-    for purpose, config in purpose_patterns.items():
-        if any(keyword in message_lower for keyword in config['keywords']):
-            return purpose, config
-    
-    # Default to feature if no clear pattern
-    return 'feature', purpose_patterns['feature']
-
-
-def get_commit_timeline():
-    """Get commits with purpose classification and impact analysis"""
+def calculate_risk_score():
+    """Calculate overall PR risk score based on multiple factors"""
     try:
-        # Get commits with detailed stats
-        cmd = ["git", "log", "--oneline", "--format=%h|%s|%ad", "--date=short", "--numstat", "-10"]
+        # Get diff stats
+        diff_stats = load_diff_stats()
+        if not diff_stats:
+            return 1, "Low", "#2ECC71"  # Green for no changes
+        
+        # Calculate base risk factors
+        total_files = len(diff_stats)
+        total_lines = sum(f['total'] for f in diff_stats)
+        
+        # File type risk weights
+        high_risk_extensions = {'.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.cpp', '.cs'}
+        # Remove unused medium_risk_extensions variable
+        
+        risk_score = 0
+        
+        # File count factor (0-3 points)
+        if total_files > 10:
+            risk_score += 3
+        elif total_files > 5:
+            risk_score += 2
+        elif total_files > 2:
+            risk_score += 1
+        
+        # Lines changed factor (0-3 points)
+        if total_lines > 500:
+            risk_score += 3
+        elif total_lines > 200:
+            risk_score += 2
+        elif total_lines > 50:
+            risk_score += 1
+        
+        # File type risk factor (0-2 points)
+        high_risk_files = sum(1 for f in diff_stats 
+                             if any(f['file'].endswith(ext) for ext in high_risk_extensions))
+        if high_risk_files > 5:
+            risk_score += 2
+        elif high_risk_files > 2:
+            risk_score += 1
+        
+        # Deletion ratio factor (0-2 points) - high deletions = higher risk
+        total_deletions = sum(f.get('deletions', 0) for f in diff_stats)
+        if total_lines > 0:
+            deletion_ratio = total_deletions / total_lines
+            if deletion_ratio > 0.4:
+                risk_score += 2
+            elif deletion_ratio > 0.2:
+                risk_score += 1
+        
+        # Convert to 1-10 scale and categorize
+        risk_score = min(10, max(1, risk_score))
+        
+        if risk_score >= 7:
+            return risk_score, "High", "#E74C3C"  # Red
+        elif risk_score >= 4:
+            return risk_score, "Medium", "#F39C12"  # Orange
+        else:
+            return risk_score, "Low", "#2ECC71"  # Green
+            
+    except Exception as e:
+        print(f"Error calculating risk score: {e}")
+        return 3, "Medium", "#F39C12"
+
+
+def estimate_review_time():
+    """Estimate review time based on change complexity"""
+    try:
+        diff_stats = load_diff_stats()
+        if not diff_stats:
+            return "5 min", "#2ECC71"
+        
+        total_files = len(diff_stats)
+        total_lines = sum(f['total'] for f in diff_stats)
+        
+        # Base time calculation
+        minutes = 5  # Base review time
+        
+        # Add time per file (2 min per file)
+        minutes += total_files * 2
+        
+        # Add time per 50 lines (5 min per 50 lines)
+        minutes += (total_lines // 50) * 5
+        
+        # Complexity multipliers for certain file types
+        complex_files = sum(1 for f in diff_stats 
+                           if any(f['file'].endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx']))
+        if complex_files > 3:
+            minutes = int(minutes * 1.5)
+        
+        # Format time estimate
+        if minutes < 60:
+            time_str = f"{minutes} min"
+            color = "#2ECC71" if minutes < 30 else "#F39C12"
+        else:
+            hours = minutes // 60
+            remaining_mins = minutes % 60
+            if remaining_mins > 0:
+                time_str = f"{hours}h {remaining_mins}m"
+            else:
+                time_str = f"{hours}h"
+            color = "#E74C3C" if hours > 2 else "#F39C12"
+        
+        return time_str, color
+        
+    except Exception as e:
+        print(f"Error estimating review time: {e}")
+        return "15 min", "#F39C12"
+
+
+def analyze_change_intent():
+    """Analyze git commits to determine actual development intent"""
+    try:
+        # Get recent commit messages
+        cmd = ["git", "log", "--oneline", "--format=%s", "-10"]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         
         if result.returncode != 0:
-            return []
+            return ["Code changes", "General updates", "Maintenance"]
         
-        commits = []
-        current_commit = None
+        messages = result.stdout.strip().split('\n')
         
-        for line in result.stdout.strip().split('\n'):
-            if '|' in line and not line.startswith('\t'):
-                # This is a commit line
-                if current_commit:
-                    commits.append(current_commit)
-                
-                parts = line.split('|', 2)
-                if len(parts) >= 3:
-                    current_commit = {
-                        'hash': parts[0][:7],
-                        'message': parts[1][:50],
-                        'date': parts[2],
-                        'files_changed': 0,
-                        'lines_added': 0,
-                        'lines_deleted': 0
-                    }
-            elif current_commit and '\t' in line:
-                # This is a file change line
-                parts = line.split('\t')
-                if len(parts) >= 3:
-                    try:
-                        added = int(parts[0]) if parts[0] != '-' else 0
-                        deleted = int(parts[1]) if parts[1] != '-' else 0
-                        current_commit['files_changed'] += 1
-                        current_commit['lines_added'] += added
-                        current_commit['lines_deleted'] += deleted
-                    except ValueError:
-                        continue
+        # Intent patterns with more specific, actionable descriptions
+        intent_patterns = {
+            'simplify': {
+                'keywords': ['simplify', 'clean', 'refactor', 'reduce', 'streamline'],
+                'intent': 'Simplifying codebase'
+            },
+            'secure': {
+                'keywords': ['security', 'auth', 'login', 'validate', 'sanitize', 'escape'],
+                'intent': 'Enhancing security'
+            },
+            'performance': {
+                'keywords': ['optimize', 'performance', 'speed', 'cache', 'efficient'],
+                'intent': 'Improving performance'
+            },
+            'error_handling': {
+                'keywords': ['error', 'exception', 'handle', 'catch', 'try'],
+                'intent': 'Adding error handling'
+            },
+            'ui_ux': {
+                'keywords': ['ui', 'ux', 'interface', 'design', 'style', 'layout'],
+                'intent': 'Improving user experience'
+            },
+            'feature': {
+                'keywords': ['add', 'new', 'feature', 'implement', 'create'],
+                'intent': 'Adding new functionality'
+            },
+            'fix': {
+                'keywords': ['fix', 'bug', 'issue', 'resolve', 'correct'],
+                'intent': 'Fixing bugs'
+            },
+            'remove': {
+                'keywords': ['remove', 'delete', 'legacy', 'deprecated', 'unused'],
+                'intent': 'Removing legacy code'
+            },
+            'test': {
+                'keywords': ['test', 'spec', 'coverage', 'unit'],
+                'intent': 'Improving test coverage'
+            },
+            'docs': {
+                'keywords': ['doc', 'readme', 'comment', 'documentation'],
+                'intent': 'Updating documentation'
+            }
+        }
         
-        # Add the last commit
-        if current_commit:
-            commits.append(current_commit)
+        # Analyze messages for intents
+        detected_intents = []
+        for message in messages:
+            message_lower = message.lower()
+            for pattern_name, pattern_data in intent_patterns.items():
+                if any(keyword in message_lower for keyword in pattern_data['keywords']):
+                    intent = pattern_data['intent']
+                    if intent not in detected_intents:
+                        detected_intents.append(intent)
+                    break
         
-        # Classify each commit's purpose
-        for commit in commits:
-            purpose, purpose_config = classify_commit_purpose(commit['message'], commit['files_changed'])
-            commit['purpose'] = purpose
-            commit['purpose_config'] = purpose_config
-            
-            # Calculate impact
-            total_changes = commit['lines_added'] + commit['lines_deleted']
-            if total_changes > 100 or commit['files_changed'] > 5:
-                commit['impact'] = 'high'
-            elif total_changes > 30 or commit['files_changed'] > 2:
-                commit['impact'] = 'medium'
-            else:
-                commit['impact'] = 'low'
+        # Return top 3 most relevant intents
+        if not detected_intents:
+            return ["Code improvements", "General updates", "Maintenance"]
         
-        return commits[:7]  # Show more commits for better purpose grouping
+        return detected_intents[:3]
         
     except Exception as e:
-        print(f"Error getting commit timeline: {e}")
+        print(f"Error analyzing change intent: {e}")
+        return ["Code changes", "Updates", "Development"]
+
+
+def load_diff_stats():
+    """Load and parse git diff statistics"""
+    possible_paths = [
+        Path(OUTPUT_DIR_RELATIVE + '/diff_stats.txt'),
+        Path('../outputs/diff_stats.txt'),
+        Path('outputs/diff_stats.txt'),
+    ]
+    
+    diff_file = None
+    for path in possible_paths:
+        if path.exists():
+            diff_file = path
+            break
+    
+    if not diff_file:
+        # Try to generate diff stats automatically
+        print("Diff stats file not found, attempting to generate...")
+        try:
+            output_dir = Path(OUTPUT_DIR_RELATIVE)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate diff stats by comparing to main/master branch
+            for base_branch in ['origin/main', 'origin/master', 'main', 'master']:
+                try:
+                    result = subprocess.run(
+                        ['git', 'diff', '--numstat', base_branch],
+                        capture_output=True,
+                        text=True,
+                        timeout=10
+                    )
+                    if result.returncode == 0 and result.stdout.strip():
+                        diff_file = output_dir / 'diff_stats.txt'
+                        with open(diff_file, 'w') as f:
+                            f.write(result.stdout)
+                        print(f"Generated diff stats using {base_branch}")
+                        break
+                except subprocess.SubprocessError:
+                    continue
+        except Exception as e:
+            print(f"Could not generate diff stats: {e}")
+    
+    if not diff_file or not diff_file.exists():
+        print("No diff stats available")
         return []
+    
+    file_changes = []
+    try:
+        with open(diff_file, 'r', encoding='utf-8-sig') as f:  # utf-8-sig handles BOM
+            for line_num, line in enumerate(f, 1):
+                parts = line.strip().split('\t')
+                
+                if len(parts) >= 3:
+                    try:
+                        additions = int(parts[0]) if parts[0] != '-' else 0
+                        deletions = int(parts[1]) if parts[1] != '-' else 0
+                        filename = parts[2]
+                        
+                        file_changes.append({
+                            'file': filename,
+                            'additions': additions,
+                            'deletions': deletions,
+                            'total': additions + deletions,
+                            'file_type': Path(filename).suffix or 'unknown',
+                            'directory': str(Path(filename).parent)
+                        })
+                    except (ValueError, IndexError):
+                        # Skip malformed lines
+                        continue
+                elif len(parts) == 1 and parts[0]:
+                    # Handle malformed lines with just filename
+                    filename = parts[0]
+                    file_changes.append({
+                        'file': filename,
+                        'additions': 0,
+                        'deletions': 0,
+                        'total': 1,  # Give it a minimal value
+                        'file_type': Path(filename).suffix or 'unknown',
+                        'directory': str(Path(filename).parent)
+                    })
+        print(f"Loaded {len(file_changes)} file changes from diff stats")
+    except Exception as e:
+        print(f"Error reading diff stats: {e}")
+        return []
+    
+    return file_changes
 
 
-def generate_clean_flow():
-    """Generate purpose-focused development flow"""
+def create_file_heatmap_data(diff_stats):
+    """Create file heatmap data with sizing and coloring"""
+    if not diff_stats:
+        return []
+    
+    # Sort by total changes and take top 10 for clarity
+    top_files = sorted(diff_stats, key=lambda x: x['total'], reverse=True)[:10]
+    
+    heatmap_data = []
+    for i, file_data in enumerate(top_files):
+        additions = file_data['additions']
+        deletions = file_data['deletions']
+        total = file_data['total']
+        
+        # Determine color based on change type
+        if deletions > additions * 1.5:
+            color = '#E74C3C'  # Deep red for heavy deletions
+            change_type = 'deletions'
+        elif additions > deletions * 1.5:
+            color = '#27AE60'  # Deep green for heavy additions  
+            change_type = 'additions'
+        else:
+            color = '#F1C40F'  # Yellow for balanced changes
+            change_type = 'balanced'
+        
+        # Size based on total changes (normalized)
+        max_changes = max(f['total'] for f in top_files)
+        size_ratio = total / max_changes if max_changes > 0 else 0.1
+        
+        # Opacity based on complexity (file type and path depth)
+        complexity = 0.5
+        if file_data['file_type'] in ['.py', '.js', '.ts', '.tsx', '.jsx']:
+            complexity += 0.3
+        if '/' in file_data['file']:
+            complexity += 0.2
+        complexity = min(1.0, complexity)
+        
+        heatmap_data.append({
+            'file': Path(file_data['file']).name,  # Just filename for display
+            'full_path': file_data['file'],
+            'size_ratio': size_ratio,
+            'color': color,
+            'opacity': complexity,
+            'total': total,
+            'additions': additions,
+            'deletions': deletions,
+            'change_type': change_type
+        })
+    
+    return heatmap_data
+
+
+def generate_impact_grid():
+    """Generate focused PR impact grid visualization"""
     if not MATPLOTLIB_AVAILABLE:
         return create_placeholder()
     
-    commits = get_commit_timeline()
-    if not commits:
-        return create_no_data_visual()
+    # Gather all data
+    risk_score, risk_level, risk_color = calculate_risk_score()
+    review_time, time_color = estimate_review_time()
+    change_intents = analyze_change_intent()
+    diff_stats = load_diff_stats()
+    heatmap_data = create_file_heatmap_data(diff_stats)
     
-    # Create larger figure for purpose visualization
-    fig, (ax_timeline, ax_groups) = plt.subplots(2, 1, figsize=(16, 10), 
-                                                 gridspec_kw={'height_ratios': [2, 1]})
+    # Create the grid layout (2x2 main grid with bottom panel)
+    fig = plt.figure(figsize=(14, 10))
+    gs = GridSpec(3, 2, height_ratios=[1, 1, 0.8], hspace=0.3, wspace=0.2)
     
-    # === TOP: PURPOSE-BASED TIMELINE ===
+    # === TOP LEFT: RISK SCORE ===
+    ax_risk = fig.add_subplot(gs[0, 0])
     
-    # Calculate positions
-    num_commits = len(commits)
-    if num_commits == 1:
-        x_positions = [0.5]
+    # Big risk score circle
+    circle = patches.Circle((0.5, 0.5), 0.35, facecolor=risk_color, alpha=0.8, edgecolor='white', linewidth=4)
+    ax_risk.add_patch(circle)
+    
+    # Risk score number
+    ax_risk.text(0.5, 0.6, str(risk_score), ha='center', va='center', 
+                fontsize=48, fontweight='bold', color='white')
+    
+    # Risk level text
+    ax_risk.text(0.5, 0.35, risk_level, ha='center', va='center', 
+                fontsize=16, fontweight='bold', color='white')
+    
+    ax_risk.set_xlim(0, 1)
+    ax_risk.set_ylim(0, 1)
+    ax_risk.set_title('Risk Score', fontsize=14, fontweight='bold', pad=20)
+    ax_risk.axis('off')
+    
+    # === TOP RIGHT: REVIEW TIME ESTIMATE ===
+    ax_time = fig.add_subplot(gs[0, 1])
+    
+    # Time estimate box
+    rect = patches.Rectangle((0.1, 0.3), 0.8, 0.4, facecolor=time_color, alpha=0.8, edgecolor='white', linewidth=3)
+    ax_time.add_patch(rect)
+    
+    # Time text
+    ax_time.text(0.5, 0.5, review_time, ha='center', va='center', 
+                fontsize=24, fontweight='bold', color='white')
+    
+    ax_time.set_xlim(0, 1)
+    ax_time.set_ylim(0, 1)
+    ax_time.set_title('Est. Review Time', fontsize=14, fontweight='bold', pad=20)
+    ax_time.axis('off')
+    
+    # === MIDDLE: FILE HEATMAP ===
+    ax_heatmap = fig.add_subplot(gs[1, :])
+    
+    if heatmap_data:
+        # Create grid layout for files (max 10 files, 2 rows of 5)
+        max_files = min(10, len(heatmap_data))
+        cols = 5
+        
+        for i, file_data in enumerate(heatmap_data[:max_files]):
+            row = i // cols
+            col = i % cols
+            
+            # Position calculation
+            x = col / cols + 0.1
+            y = 0.7 - (row * 0.4)  # Two rows
+            
+            # Rectangle size based on changes
+            width = 0.15 * file_data['size_ratio']
+            height = 0.25 * file_data['size_ratio']
+            
+            # Draw file rectangle
+            rect = patches.Rectangle((x, y), width, height, 
+                                   facecolor=file_data['color'], 
+                                   alpha=file_data['opacity'],
+                                   edgecolor='white', linewidth=2)
+            ax_heatmap.add_patch(rect)
+            
+            # Add filename (only show if it's a top file)
+            if i < 5:  # Only label top 5 files
+                ax_heatmap.text(x + width/2, y - 0.05, file_data['file'][:15], 
+                              ha='center', va='top', fontsize=8, fontweight='bold')
+            
+            # Add change count
+            ax_heatmap.text(x + width/2, y + height/2, f"{file_data['total']}", 
+                          ha='center', va='center', fontsize=10, fontweight='bold', color='white')
+    
+        # Add legend
+        legend_y = 0.05
+        ax_heatmap.text(0.1, legend_y, '● Heavy Deletions', color='#E74C3C', fontsize=10, fontweight='bold')
+        ax_heatmap.text(0.3, legend_y, '● Heavy Additions', color='#27AE60', fontsize=10, fontweight='bold')
+        ax_heatmap.text(0.5, legend_y, '● Balanced Changes', color='#F1C40F', fontsize=10, fontweight='bold')
+        ax_heatmap.text(0.7, legend_y, 'Size = Lines Changed', fontsize=10, style='italic')
     else:
-        margin = 0.08
-        available_width = 1.0 - (2 * margin)
-        spacing = available_width / (num_commits - 1)
-        x_positions = [margin + i * spacing for i in range(num_commits)]
+        ax_heatmap.text(0.5, 0.5, 'No file changes detected', ha='center', va='center', 
+                       fontsize=14, color='#7F8C8D')
     
-    # Draw timeline base
-    timeline_y = 0.5
-    if len(commits) > 1:
-        ax_timeline.plot(x_positions, [timeline_y] * len(commits), 
-                        color='#BDC3C7', linewidth=6, zorder=1, alpha=0.6)
+    ax_heatmap.set_xlim(0, 1)
+    ax_heatmap.set_ylim(0, 1)
+    ax_heatmap.set_title('File Change Heatmap', fontsize=14, fontweight='bold', pad=20)
+    ax_heatmap.axis('off')
     
-    # Draw commits on timeline
-    for i, commit in enumerate(commits):
-        x_pos = x_positions[i]
-        config = commit['purpose_config']
-        
-        # Size based on impact
-        size_map = {'high': 180, 'medium': 140, 'low': 110}
-        size = size_map[commit['impact']]
-        
-        # Draw commit point
-        ax_timeline.scatter(x_pos, timeline_y, s=size, c=config['color'], 
-                           zorder=3, edgecolors='white', linewidth=3, alpha=0.9)
-        
-        # Add purpose icon and hash above
-        ax_timeline.text(x_pos, timeline_y + 0.25, f"[{config['icon']}] {commit['hash']}", 
-                        ha='center', va='bottom', fontsize=10, 
-                        fontweight='bold', color=config['color'])
-        
-        # Add impact metrics
-        total_changes = commit['lines_added'] + commit['lines_deleted']
-        metrics_text = f"{commit['files_changed']}f, {total_changes}Δ"
-        ax_timeline.text(x_pos, timeline_y - 0.15, metrics_text, 
-                        ha='center', va='top', fontsize=9, 
-                        color='#34495E', fontweight='bold')
-        
-        # Add commit message
-        message = commit['message'][:30] + '...' if len(commit['message']) > 30 else commit['message']
-        ax_timeline.text(x_pos, timeline_y - 0.25, message, 
-                        ha='center', va='top', fontsize=8, 
-                        color='#7F8C8D', style='italic',
-                        bbox={'boxstyle': 'round,pad=0.2', 'facecolor': 'white', 'alpha': 0.9, 'edgecolor': config['color'], 'linewidth': 1})
-        
-        # Add date
-        ax_timeline.text(x_pos, timeline_y - 0.35, commit['date'], 
-                        ha='center', va='top', fontsize=7, 
-                        color='#95A5A6')
+    # === BOTTOM: CHANGE INTENT SUMMARY ===
+    ax_summary = fig.add_subplot(gs[2, :])
     
-    # Timeline styling
-    ax_timeline.set_xlim(0, 1)
-    ax_timeline.set_ylim(0, 1)
-    ax_timeline.set_title('Development Purpose Timeline', fontsize=18, pad=20, fontweight='bold', color='#2C3E50')
-    ax_timeline.axis('off')
+    # Display change intents as tags
+    if change_intents:
+        intent_colors = ['#3498DB', '#E74C3C', '#2ECC71']
+        for i, intent in enumerate(change_intents):
+            x = 0.1 + (i * 0.28)
+            color = intent_colors[i % len(intent_colors)]
+            
+            # Intent tag
+            rect = patches.Rectangle((x, 0.4), 0.25, 0.3, facecolor=color, alpha=0.8, 
+                                   edgecolor='white', linewidth=2, 
+                                   transform=ax_summary.transAxes)
+            ax_summary.add_patch(rect)
+            
+            # Intent text
+            ax_summary.text(x + 0.125, 0.55, intent, ha='center', va='center', 
+                          fontsize=11, fontweight='bold', color='white',
+                          transform=ax_summary.transAxes)
     
-    # === BOTTOM: PURPOSE GROUPS SUMMARY ===
+    # Summary stats
+    total_files = len(diff_stats) if diff_stats else 0
+    total_lines = sum(f['total'] for f in diff_stats) if diff_stats else 0
     
-    # Group commits by purpose
-    purpose_groups = {}
-    for commit in commits:
-        purpose = commit['purpose']
-        if purpose not in purpose_groups:
-            purpose_groups[purpose] = {
-                'commits': [],
-                'config': commit['purpose_config'],
-                'total_files': 0,
-                'total_changes': 0
-            }
-        purpose_groups[purpose]['commits'].append(commit)
-        purpose_groups[purpose]['total_files'] += commit['files_changed']
-        purpose_groups[purpose]['total_changes'] += commit['lines_added'] + commit['lines_deleted']
+    summary_text = f"PR Impact: {total_files} files changed • {total_lines} lines modified"
+    ax_summary.text(0.5, 0.15, summary_text, ha='center', va='center', 
+                   fontsize=12, fontweight='bold', color='#2C3E50',
+                   transform=ax_summary.transAxes)
     
-    # Draw purpose groups
-    group_positions = list(range(len(purpose_groups)))
-    group_x_positions = [i / max(1, len(purpose_groups) - 1) if len(purpose_groups) > 1 else 0.5 for i in group_positions]
+    ax_summary.set_title('Development Intent', fontsize=14, fontweight='bold', pad=20)
+    ax_summary.axis('off')
     
-    for i, (purpose, group_data) in enumerate(purpose_groups.items()):
-        x_pos = group_x_positions[i] if len(purpose_groups) > 1 else 0.5
-        config = group_data['config']
-        count = len(group_data['commits'])
-        
-        # Draw group circle (size based on commit count)
-        circle_size = 100 + (count * 30)
-        ax_groups.scatter(x_pos, 0.6, s=circle_size, c=config['color'], 
-                         zorder=3, edgecolors='white', linewidth=3, alpha=0.8)
-        
-        # Add purpose label and count
-        ax_groups.text(x_pos, 0.6, f"[{config['icon']}]\n{count}", 
-                      ha='center', va='center', fontsize=11, 
-                      fontweight='bold', color='white')
-        
-        # Add purpose name below
-        ax_groups.text(x_pos, 0.35, config['label'], 
-                      ha='center', va='top', fontsize=10, 
-                      fontweight='bold', color=config['color'])
-        
-        # Add metrics below
-        metrics = f"{group_data['total_files']}f, {group_data['total_changes']}Δ"
-        ax_groups.text(x_pos, 0.25, metrics, 
-                      ha='center', va='top', fontsize=8, 
-                      color='#34495E')
-    
-    # Groups styling
-    ax_groups.set_xlim(0, 1)
-    ax_groups.set_ylim(0, 1)
-    ax_groups.set_title('Purpose Groups Summary', fontsize=14, pad=15, fontweight='bold', color='#2C3E50')
-    ax_groups.axis('off')
-    
-    # Add overall summary
-    total_files = sum(c['files_changed'] for c in commits)
-    total_added = sum(c['lines_added'] for c in commits)
-    total_deleted = sum(c['lines_deleted'] for c in commits)
-    
-    summary_text = f"PR Development: {len(commits)} commits across {len(purpose_groups)} purposes • {total_files} files • +{total_added}/-{total_deleted} lines"
-    fig.suptitle(summary_text, fontsize=13, fontweight='bold', color='#2C3E50', y=0.02)
-    
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.95, bottom=0.08)
-
-    # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'Development Timeline')
-    plt.close()
-    
-    return True
-
-
-def create_ultra_simple_flow(commits):
-    """Create minimal text-based flow if image is too large"""
-    fig, ax = plt.subplots(figsize=(8, 2))
-    
-    # Just show commit count and latest commit
-    latest = commits[0] if commits else {'message': 'No commits', 'hash': ''}
-    
-    ax.text(0.5, 0.7, f"{len(commits)} Recent Commits", 
-           ha='center', va='center', fontsize=16, fontweight='bold')
-    ax.text(0.5, 0.3, f"Latest: {latest['message']}", 
-           ha='center', va='center', fontsize=12)
-    
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
-    ax.axis('off')
+    # Overall title
+    fig.suptitle('PR Impact Analysis', fontsize=18, fontweight='bold', y=0.95)
     
     plt.tight_layout()
     
     # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'Development Timeline')
+    save_image_with_base64(fig, 'development_flow', 'PR Impact Grid')
     plt.close()
     
     return True
 
 
 def create_no_data_visual():
-    """Create minimal visual when no commit data available"""
-    fig, ax = plt.subplots(figsize=(6, 2))
+    """Create minimal visual when no data available"""
+    fig, ax = plt.subplots(figsize=(8, 6))
     
-    ax.text(0.5, 0.5, 'No Development Data Available', 
-           ha='center', va='center', fontsize=14)
+    ax.text(0.5, 0.5, 'No Change Data Available', 
+           ha='center', va='center', fontsize=16, fontweight='bold', color='#7F8C8D')
+    ax.text(0.5, 0.3, 'Unable to analyze PR impact', 
+           ha='center', va='center', fontsize=12, color='#95A5A6')
+    
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis('off')
@@ -439,7 +622,7 @@ def create_no_data_visual():
     plt.tight_layout()
     
     # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'Development Timeline')
+    save_image_with_base64(fig, 'development_flow', 'PR Impact Grid')
     plt.close()
     
     return True
@@ -447,31 +630,47 @@ def create_no_data_visual():
 
 def create_placeholder():
     """Create text placeholder when matplotlib unavailable"""
-    output_file = '.code-analysis/outputs/development_flow_placeholder.md'
+    output_dir = None
+    for check_dir in [OUTPUT_DIR_RELATIVE, '../outputs', 'outputs']:
+        if Path(check_dir).exists() or Path(check_dir).parent.exists():
+            output_dir = Path(check_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            break
+    
+    if not output_dir:
+        output_dir = Path(OUTPUT_DIR_RELATIVE)
+        output_dir.mkdir(parents=True, exist_ok=True)
+    
+    output_file = output_dir / 'development_flow_placeholder.md'
     
     with open(output_file, 'w') as f:
-        f.write("# Development Flow\n\n")
-        f.write("Visual flow generation requires matplotlib.\n\n")
+        f.write("# PR Impact Analysis\n\n")
+        f.write("Visual impact grid generation requires matplotlib.\n\n")
         f.write("Install with: `pip install matplotlib numpy`\n")
     
-    print("Created development flow placeholder")
+    print("Created PR impact analysis placeholder")
     return False
 
 
 def main():
     """Main execution function"""
-    print("Generating optimized development flow...")
+    print("Generating PR impact grid...")
     
     # Ensure output directory exists
-    Path('.code-analysis/outputs').mkdir(parents=True, exist_ok=True)
+    for check_dir in [OUTPUT_DIR_RELATIVE, '../outputs', 'outputs']:
+        try:
+            Path(check_dir).mkdir(parents=True, exist_ok=True)
+            break
+        except OSError:
+            continue
     
     try:
-        success = generate_clean_flow()
+        success = generate_impact_grid()
         if success:
-            print("Optimized development flow generation complete!")
+            print("PR impact grid generation complete!")
         return success
     except Exception as e:
-        print(f"Error generating development flow: {e}")
+        print(f"Error generating PR impact grid: {e}")
         return create_placeholder()
 
 
