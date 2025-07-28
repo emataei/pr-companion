@@ -164,7 +164,7 @@ jobs:
       - name: Generate documentation suggestions
         run: |
           echo "Analyzing documentation needs..."
-          python .code-analysis/scripts/generate_documentation_suggestions.py || python .code-analysis/scripts/generate_documentation_suggestions_fallback.py
+          python .code-analysis/scripts/generate_concise_documentation_suggestions.py
         env:
           GITHUB_BASE_REF: ${{ github.base_ref }}
           GITHUB_HEAD_REF: ${{ github.head_ref }}

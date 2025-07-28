@@ -74,7 +74,6 @@ module.exports = async ({ github, context }) => {
 2. **Check the main dashboard**: [Visual Dashboard](${visualUrls.urls.index}) (this usually works first)
 3. **Direct image links**:
    - [PR Impact Grid](${visualUrls.urls.development_flow})
-   - [Story Arc](${visualUrls.urls.story_arc})
    - [Dependency Graph](${visualUrls.urls.dependency_pr})
 
 **Common issues:**
@@ -95,11 +94,6 @@ This comment will be updated once visuals are confirmed working.
 Shows risk score, review time estimate, file change heatmap, and development intent.
 
 ![PR Impact Grid](${visualUrls.urls.development_flow})
-
-### Story Arc Analysis
-Shows the evolution and complexity changes over time.
-
-![Story Arc](${visualUrls.urls.story_arc})
 
 ### Dependency Analysis
 Dependencies for the changes in this PR:
@@ -191,7 +185,6 @@ Visual analysis is being generated and deployed to GitHub Pages.
 **Expected URLs:**
 - [Visual Dashboard](${visualUrls.urls.index})
 - [PR Impact Grid](${visualUrls.urls.development_flow})
-- [Story Arc](${visualUrls.urls.story_arc})
 - [Dependency Graph](${visualUrls.urls.dependency_pr})
 
 **If this is the first PR:**
