@@ -26,6 +26,14 @@ interface UserPreferences {
   notifications: boolean
   language: string
 }
+  preferences?: UserPreferences
+}
+
+interface UserPreferences {
+  theme: 'light' | 'dark' | 'auto'
+  notifications: boolean
+  language: string
+}
 
 /**
  * UserProfile component for displaying and editing user information
@@ -267,4 +275,35 @@ export function UserProfile({ title, onSave, variant = 'primary', userId }: User
       )}
     </main>
   )
+}
+
+/**
+ * Utility function to validate user preferences
+ * @param preferences - User preferences object to validate
+ * @returns Boolean indicating if preferences are valid
+ */
+export function validateUserPreferences(preferences: UserPreferences): boolean {
+  const validThemes = ['light', 'dark', 'auto']
+  const validLanguages = ['en', 'es', 'fr', 'de', 'ja']
+  
+  return (
+    validThemes.includes(preferences.theme) &&
+    typeof preferences.notifications === 'boolean' &&
+    validLanguages.includes(preferences.language)
+  )
+}
+
+/**
+ * Format user data for display
+ * @param userData - Raw user data from API
+ * @returns Formatted user data
+ */
+export function formatUserData(userData: UserData): UserData {
+  return {
+    ...userData,
+    name: userData.name.trim(),
+    email: userData.email.toLowerCase(),
+    bio: userData.bio?.trim() || undefined,
+    lastLogin: userData.lastLogin ? new Date(userData.lastLogin) : undefined
+  }
 }

@@ -7,6 +7,8 @@ const UserQuerySchema = z.object({
   id: z.string().uuid().optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10),
+  search: z.string().optional(),
+  status: z.enum(['active', 'inactive', 'pending']).optional(),
 })
 
 const CreateUserSchema = z.object({
@@ -15,6 +17,11 @@ const CreateUserSchema = z.object({
   phone: z.string().optional(),
   location: z.string().max(200).optional(),
   bio: z.string().max(500).optional(),
+  preferences: z.object({
+    theme: z.enum(['light', 'dark', 'auto']).default('light'),
+    notifications: z.boolean().default(true),
+    language: z.string().min(2).max(5).default('en'),
+  }).optional(),
 })
 
 const UpdateUserSchema = CreateUserSchema.partial()
@@ -28,6 +35,11 @@ interface User {
   location?: string
   bio?: string
   createdAt: string
+  preferences?: {
+    theme: 'light' | 'dark' | 'auto'
+    notifications: boolean
+    language: string
+  }
 }
 
 // Mock database for demonstration

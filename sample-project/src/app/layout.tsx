@@ -5,6 +5,11 @@ export const metadata = {
   description: 'Testing quality gate system',
 }
 
+// Configuration from environment variables
+const isDevelopment = process.env.NODE_ENV === 'development'
+const analyticsId = process.env.ANALYTICS_ID
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000'
+
 export default function RootLayout({
   children,
 }: {
