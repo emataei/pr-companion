@@ -107,6 +107,8 @@ async function generateEnhancedImageReport() {
     'dependency_graph_pr.png': 'PR Dependencies'
   };
   
+  console.log('Looking for images in:', path.resolve(outputsDir));
+  
   let reportContent = '## Enhanced PR Visuals\n\n';
   reportContent += '*Real-time analytics with embedded images for instant viewing*\n\n';
   

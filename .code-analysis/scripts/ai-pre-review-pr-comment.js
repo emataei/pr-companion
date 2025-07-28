@@ -80,6 +80,12 @@ function buildComment(results) {
     comment += qualitySection;
   }
 
+  // Smart recommendations (context-aware) - prioritized after quality gate
+  const recommendationsSection = buildRecommendationsSection();
+  if (recommendationsSection) {
+    comment += recommendationsSection;
+  }
+
   // Change intent section (more precise and valuable)
   const intentSection = buildIntentSection(intentResults);
   if (intentSection) {
@@ -100,12 +106,6 @@ function buildComment(results) {
   const impactSection = buildImpactSection(results);
   if (impactSection) {
     comment += impactSection;
-  }
-
-  // Smart recommendations (context-aware)
-  const recommendationsSection = buildRecommendationsSection();
-  if (recommendationsSection) {
-    comment += recommendationsSection;
   }
 
   // Enhanced PR impact analysis (new visual design)

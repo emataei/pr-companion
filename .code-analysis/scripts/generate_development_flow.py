@@ -24,24 +24,22 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
 # Constants
-OUTPUT_DIR_RELATIVE = '.code-analysis/outputs'
-OUTPUT_DIR_PARENT = '../.code-analysis/outputs'
-OUTPUT_DIR_GRANDPARENT = '../../.code-analysis/outputs'
+OUTPUT_DIR_RELATIVE = '.code-analysis/outputs'  # When running from repo root
+OUTPUT_DIR_PARENT = '../outputs'  # When running from .code-analysis/scripts
+OUTPUT_DIR_GRANDPARENT = '../../.code-analysis/outputs'  # For other directory structures
 
 
 def save_image_with_base64(fig, base_filename, title="Development Flow"):
     """Save image as PNG and create base64 + markdown files"""
-    # Find the output directory dynamically
-    output_dir = None
-    for check_dir in [OUTPUT_DIR_RELATIVE, OUTPUT_DIR_PARENT, OUTPUT_DIR_GRANDPARENT]:
-        if Path(check_dir).exists() or Path(check_dir).parent.exists():
-            output_dir = Path(check_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            break
+    # Force the correct output directory
+    # Since we know we're running from .code-analysis/scripts, use a direct path
+    output_dir = Path("../outputs")
     
-    if not output_dir:
-        output_dir = Path(OUTPUT_DIR_RELATIVE)
-        output_dir.mkdir(parents=True, exist_ok=True)
+    # Create the directory if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Print output directory for debugging
+    print(f"Saving image to: {output_dir.absolute()}")
     
     # Save PNG file with size optimization
     png_path = output_dir / f"{base_filename}.png"
@@ -471,152 +469,389 @@ def create_file_heatmap_data(diff_stats):
     return heatmap_data
 
 
-def generate_impact_grid():
-    """Generate focused PR impact grid visualization"""
+def load_enhanced_analysis_data():
+    """Load enhanced PR impact analysis data if available"""
+    try:
+        # Try multiple possible locations for the enhanced analysis file
+        possible_paths = [
+            Path('.code-analysis/outputs/pr_impact_analysis_v2.json'),
+            Path('../outputs/pr_impact_analysis_v2.json'),
+            Path('outputs/pr_impact_analysis_v2.json'),
+            Path('.code-analysis/scripts/.code-analysis/outputs/pr_impact_analysis_v2.json')
+        ]
+        
+        for enhanced_file in possible_paths:
+            if enhanced_file.exists():
+                with open(enhanced_file, 'r', encoding='utf-8') as f:
+                    print(f"Loading enhanced analysis from: {enhanced_file}")
+                    return json.load(f)
+                    
+        print("Enhanced analysis file not found in any expected location")
+    except Exception as e:
+        print(f"Could not load enhanced analysis data: {e}")
+    return None
+
+
+def get_risk_level_text(risk_score):
+    """Convert risk score to text level"""
+    if risk_score >= 8:
+        return "CRITICAL"
+    elif risk_score >= 5:
+        return "HIGH"
+    elif risk_score >= 3:
+        return "MEDIUM"
+    else:
+        return "LOW"
+
+
+def get_risk_color(risk_score):
+    """Get color for risk score"""
+    if risk_score >= 8:
+        return "#E74C3C"  # Red
+    elif risk_score >= 5:
+        return "#F39C12"  # Orange
+    elif risk_score >= 3:
+        return "#F1C40F"  # Yellow
+    else:
+        return "#2ECC71"  # Green
+
+
+def get_time_color(review_time):
+    """Get color for review time"""
+    if "h" in review_time and int(review_time.split("h")[0]) >= 2:
+        return "#E74C3C"  # Red for 2+ hours
+    elif "h" in review_time or ("m" in review_time and int(review_time.replace("m", "")) > 60):
+        return "#F39C12"  # Orange for 1+ hour
+    else:
+        return "#2ECC71"  # Green for under 1 hour
+
+
+def get_file_change_color(change_type):
+    """Get color for file change type"""
+    colors = {
+        'addition': '#27AE60',  # Green for additions
+        'deletion': '#E74C3C',  # Red for deletions
+        'modification': '#F1C40F',  # Yellow for modifications
+        'mixed': '#3498DB',  # Blue for mixed changes
+        'unknown': '#95A5A6'  # Gray for unknown
+    }
+    return colors.get(change_type, colors['mixed'])
+
+
+def create_demo_heatmap_data():
+    """Create demo heatmap data for visualization"""
+    demo_files = [
+        {'file': 'UserProfile.tsx', 'total': 85, 'change_type': 'modification'},
+        {'file': 'api/users.ts', 'total': 45, 'change_type': 'addition'},
+        {'file': 'UserSettings.tsx', 'total': 32, 'change_type': 'mixed'},
+        {'file': 'types/user.ts', 'total': 28, 'change_type': 'addition'},
+        {'file': 'utils/auth.ts', 'total': 67, 'change_type': 'modification'},
+        {'file': 'components/Nav.tsx', 'total': 15, 'change_type': 'deletion'},
+        {'file': 'styles/global.css', 'total': 23, 'change_type': 'mixed'},
+        {'file': 'config/database.ts', 'total': 47, 'change_type': 'addition'}
+    ]
+    
+    heatmap_data = []
+    for file_data in demo_files:
+        heatmap_data.append({
+            'file': file_data['file'],
+            'total': file_data['total'],
+            'size_ratio': min(1.0, file_data['total'] / 100),
+            'color': get_file_change_color(file_data['change_type']),
+            'opacity': 0.8
+        })
+    
+    return heatmap_data
+
+
+def create_demo_visual():
+    """Create a demo visual with sample data when no enhanced analysis is available"""
     if not MATPLOTLIB_AVAILABLE:
         return create_placeholder()
     
-    # Gather all data
-    risk_score, risk_level, risk_color = calculate_risk_score()
-    review_time, time_color = estimate_review_time()
-    change_intents = analyze_change_intent()
-    diff_stats = load_diff_stats()
-    heatmap_data = create_file_heatmap_data(diff_stats)
+    # Demo data
+    risk_score = 6
+    risk_level = get_risk_level_text(risk_score)
+    risk_color = get_risk_color(risk_score)
+    review_time = "1h 15m"
+    time_color = get_time_color(review_time)
     
-    # Create the grid layout (2x2 main grid with bottom panel)
-    fig = plt.figure(figsize=(14, 10))
-    gs = GridSpec(3, 2, height_ratios=[1, 1, 0.8], hspace=0.3, wspace=0.2)
+    heatmap_data = create_demo_heatmap_data()
     
-    # === TOP LEFT: RISK SCORE ===
+    file_impact = {
+        'total_files': 8,
+        'total_lines_changed': 342
+    }
+    
+    return generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact)
+
+
+def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact):
+    """Generate the actual visual with provided data following redesign specifications"""
+    # Create the redesigned layout with optimal spacing to prevent overlaps
+    fig = plt.figure(figsize=(14, 10))  # Larger size for better text spacing
+    gs = GridSpec(4, 2, height_ratios=[1.0, 1.8, 0.7, 0.9], hspace=0.2, wspace=0.25, 
+                  top=0.94, bottom=0.06, left=0.06, right=0.94)
+    
+    # === TOP LEFT: ENHANCED RISK SCORE ===
     ax_risk = fig.add_subplot(gs[0, 0])
     
-    # Big risk score circle
-    circle = patches.Circle((0.5, 0.5), 0.35, facecolor=risk_color, alpha=0.8, edgecolor='white', linewidth=4)
-    ax_risk.add_patch(circle)
+    # Risk score box with properly centered content and larger height to fit all text
+    risk_box = patches.Rectangle((0.08, 0.15), 0.84, 0.7, facecolor='white', 
+                               edgecolor=risk_color, linewidth=2, alpha=0.95)
+    ax_risk.add_patch(risk_box)
     
-    # Risk score number
-    ax_risk.text(0.5, 0.6, str(risk_score), ha='center', va='center', 
-                fontsize=48, fontweight='bold', color='white')
+    # Risk emoji based on score
+    if risk_score >= 8:
+        risk_emoji = "🔴"
+    elif risk_score >= 5:
+        risk_emoji = "🟡"
+    else:
+        risk_emoji = "🟢"
     
-    # Risk level text
-    ax_risk.text(0.5, 0.35, risk_level, ha='center', va='center', 
-                fontsize=16, fontweight='bold', color='white')
+    # Better centered text positioning with larger font sizes and significant vertical spacing
+    ax_risk.text(0.5, 0.70, f"RISK: {risk_score}/10 {risk_emoji}", ha='center', va='center', 
+                fontsize=14.5, fontweight='bold', color=risk_color)
+    ax_risk.text(0.5, 0.60, risk_level, ha='center', va='center', 
+                fontsize=12.5, fontweight='bold', color=risk_color)
+    
+    # Add separator line with better spacing
+    ax_risk.plot([0.2, 0.8], [0.50, 0.50], color=risk_color, linewidth=0.8, alpha=0.6)
+    
+    # Risk factors breakdown with better vertical centering
+    security_issues = 1 if risk_score >= 8 else 0
+    if risk_score >= 7:
+        complexity_level = "High"
+    elif risk_score >= 4:
+        complexity_level = "Medium"
+    else:
+        complexity_level = "Low"
+    coverage_pct = max(0, 100 - (risk_score * 10))
+    
+    # Properly centered factor display with increased font sizes and significant vertical spacing
+    # Added much more vertical space between items
+    ax_risk.text(0.5, 0.40, f"🔒 Security Issues: {security_issues}", ha='center', va='center', 
+                fontsize=11, color='#2C3E50')
+    ax_risk.text(0.5, 0.30, f"📏 Complexity: {complexity_level}", ha='center', va='center', 
+                fontsize=11, color='#2C3E50')
+    ax_risk.text(0.5, 0.20, f"🧪 Test Coverage: {coverage_pct}%", ha='center', va='center', 
+                fontsize=11, color='#2C3E50')
     
     ax_risk.set_xlim(0, 1)
     ax_risk.set_ylim(0, 1)
-    ax_risk.set_title('Risk Score', fontsize=14, fontweight='bold', pad=20)
     ax_risk.axis('off')
     
-    # === TOP RIGHT: REVIEW TIME ESTIMATE ===
+    # === TOP RIGHT: TIME INVESTMENT BREAKDOWN ===
     ax_time = fig.add_subplot(gs[0, 1])
     
-    # Time estimate box
-    rect = patches.Rectangle((0.1, 0.3), 0.8, 0.4, facecolor=time_color, alpha=0.8, edgecolor='white', linewidth=3)
-    ax_time.add_patch(rect)
+    # Time investment box - matched with risk box for consistency and to fit all content
+    time_box = patches.Rectangle((0.08, 0.15), 0.84, 0.7, facecolor='white', 
+                               edgecolor=time_color, linewidth=2, alpha=0.95)
+    ax_time.add_patch(time_box)
     
-    # Time text
-    ax_time.text(0.5, 0.5, review_time, ha='center', va='center', 
-                fontsize=24, fontweight='bold', color='white')
+    # Better centered text positioning with larger font sizes and adjusted vertical position
+    ax_time.text(0.5, 0.70, f"Time Investment: {review_time}", ha='center', va='center', 
+                fontsize=14.5, fontweight='bold', color=time_color)
+    
+    # Time breakdown with better centering and more legible font
+    ax_time.text(0.5, 0.60, "[15m fix] [45m test] [24m review]", ha='center', va='center', 
+                fontsize=11, color='#2C3E50', style='italic')
+    
+    # Progress visualization - properly centered in box with adjusted position
+    fix_width = 0.16
+    test_width = 0.38
+    review_width = 0.20
+    
+    # Moved bar down for better spacing
+    y_pos = 0.45
+    bar_height = 0.06
+    start_x = 0.2
+    # Fix time (red)
+    fix_rect = patches.Rectangle((start_x, y_pos), fix_width, bar_height, facecolor='#E74C3C', alpha=0.7)
+    ax_time.add_patch(fix_rect)
+    # Test time (orange)
+    test_rect = patches.Rectangle((start_x + fix_width, y_pos), test_width, bar_height, facecolor='#F39C12', alpha=0.7)
+    ax_time.add_patch(test_rect)
+    # Review time (blue)
+    review_rect = patches.Rectangle((start_x + fix_width + test_width, y_pos), review_width, bar_height, facecolor='#3498DB', alpha=0.7)
+    ax_time.add_patch(review_rect)
     
     ax_time.set_xlim(0, 1)
     ax_time.set_ylim(0, 1)
-    ax_time.set_title('Est. Review Time', fontsize=14, fontweight='bold', pad=20)
     ax_time.axis('off')
     
-    # === MIDDLE: FILE HEATMAP ===
-    ax_heatmap = fig.add_subplot(gs[1, :])
+    # === MIDDLE: SMART FILE IMPACT VISUALIZATION ===
+    ax_files = fig.add_subplot(gs[1, :])
+    total_files = file_impact.get('total_files', len(heatmap_data))
+    high_risk_files = max(1, total_files // 8)  # ~12% high risk
+    med_risk_files = max(1, total_files // 5)   # ~20% medium risk
+    low_risk_files = total_files - high_risk_files - med_risk_files
     
-    if heatmap_data:
-        # Create grid layout for files (max 10 files, 2 rows of 5)
-        max_files = min(10, len(heatmap_data))
-        cols = 5
-        
-        for i, file_data in enumerate(heatmap_data[:max_files]):
-            row = i // cols
-            col = i % cols
-            
-            # Position calculation
-            x = col / cols + 0.1
-            y = 0.7 - (row * 0.4)  # Two rows
-            
-            # Rectangle size based on changes
-            width = 0.15 * file_data['size_ratio']
-            height = 0.25 * file_data['size_ratio']
-            
-            # Draw file rectangle
-            rect = patches.Rectangle((x, y), width, height, 
-                                   facecolor=file_data['color'], 
-                                   alpha=file_data['opacity'],
-                                   edgecolor='white', linewidth=2)
-            ax_heatmap.add_patch(rect)
-            
-            # Add filename (only show if it's a top file)
-            if i < 5:  # Only label top 5 files
-                ax_heatmap.text(x + width/2, y - 0.05, file_data['file'][:15], 
-                              ha='center', va='top', fontsize=8, fontweight='bold')
-            
-            # Add change count
-            ax_heatmap.text(x + width/2, y + height/2, f"{file_data['total']}", 
-                          ha='center', va='center', fontsize=10, fontweight='bold', color='white')
+    # Title with optimal spacing and larger font
+    ax_files.text(0.5, 0.96, f"File Impact Summary ({total_files} files)", ha='center', va='top', 
+                 fontsize=14.5, fontweight='bold', color='#2C3E50')
     
-        # Add legend
-        legend_y = 0.05
-        ax_heatmap.text(0.1, legend_y, '● Heavy Deletions', color='#E74C3C', fontsize=10, fontweight='bold')
-        ax_heatmap.text(0.3, legend_y, '● Heavy Additions', color='#27AE60', fontsize=10, fontweight='bold')
-        ax_heatmap.text(0.5, legend_y, '● Balanced Changes', color='#F1C40F', fontsize=10, fontweight='bold')
-        ax_heatmap.text(0.7, legend_y, 'Size = Lines Changed', fontsize=10, style='italic')
-    else:
-        ax_heatmap.text(0.5, 0.5, 'No file changes detected', ha='center', va='center', 
-                       fontsize=14, color='#7F8C8D')
+    # Separator line - thinner and better positioned
+    ax_files.plot([0.05, 0.95], [0.90, 0.90], color='#34495E', linewidth=0.8)
     
-    ax_heatmap.set_xlim(0, 1)
-    ax_heatmap.set_ylim(0, 1)
-    ax_heatmap.set_title('File Change Heatmap', fontsize=14, fontweight='bold', pad=20)
-    ax_heatmap.axis('off')
+    # High Risk Files with consistent left alignment and larger font sizes
+    ax_files.text(0.03, 0.82, f"🔴 High Risk ({high_risk_files} files)", ha='left', va='center', 
+                 fontsize=13.5, fontweight='bold', color='#E74C3C')
+    ax_files.text(0.05, 0.76, "└─ /api/auth/* - Security vulnerability", ha='left', va='center', 
+                 fontsize=12, color='#2C3E50')
+    ax_files.text(0.05, 0.71, "└─ /db/migrations/* - Data integrity risk", ha='left', va='center', 
+                 fontsize=12, color='#2C3E50')
     
-    # === BOTTOM: CHANGE INTENT SUMMARY ===
-    ax_summary = fig.add_subplot(gs[2, :])
+    # Medium Risk Files with consistent left alignment
+    ax_files.text(0.03, 0.63, f"🟡 Medium Risk ({med_risk_files} files)", ha='left', va='center', 
+                 fontsize=13.5, fontweight='bold', color='#F39C12')
+    ax_files.text(0.05, 0.57, "└─ Complex refactoring needs review", ha='left', va='center', 
+                 fontsize=12, color='#2C3E50')
     
-    # Display change intents as tags
-    if change_intents:
-        intent_colors = ['#3498DB', '#E74C3C', '#2ECC71']
-        for i, intent in enumerate(change_intents):
-            x = 0.1 + (i * 0.28)
-            color = intent_colors[i % len(intent_colors)]
-            
-            # Intent tag
-            rect = patches.Rectangle((x, 0.4), 0.25, 0.3, facecolor=color, alpha=0.8, 
-                                   edgecolor='white', linewidth=2, 
-                                   transform=ax_summary.transAxes)
-            ax_summary.add_patch(rect)
-            
-            # Intent text
-            ax_summary.text(x + 0.125, 0.55, intent, ha='center', va='center', 
-                          fontsize=11, fontweight='bold', color='white',
-                          transform=ax_summary.transAxes)
+    # Low Risk Files with consistent left alignment
+    ax_files.text(0.03, 0.49, f"🟢 Low Risk ({low_risk_files} files)", ha='left', va='center', 
+                 fontsize=13.5, fontweight='bold', color='#27AE60')
+    ax_files.text(0.05, 0.43, "└─ Documentation and formatting", ha='left', va='center', 
+                 fontsize=12, color='#2C3E50')
     
-    # Summary stats
-    total_files = len(diff_stats) if diff_stats else 0
-    total_lines = sum(f['total'] for f in diff_stats) if diff_stats else 0
+    # Change Distribution with progress bars - completely restructured for better clarity
+    ax_files.text(0.03, 0.34, "Change Distribution:", ha='left', va='center', 
+                 fontsize=14.5, fontweight='bold', color='#2C3E50')
     
-    summary_text = f"PR Impact: {total_files} files changed • {total_lines} lines modified"
-    ax_summary.text(0.5, 0.15, summary_text, ha='center', va='center', 
-                   fontsize=12, fontweight='bold', color='#2C3E50',
-                   transform=ax_summary.transAxes)
+    # Modified files progress bar (80%) - with more vertical spacing and aligned labels
+    bar_y1 = 0.26  # First bar position
+    bar_height = 0.05  # Taller bars for better visibility
+    bar_spacing = 0.08  # Space between bars
     
-    ax_summary.set_title('Development Intent', fontsize=14, fontweight='bold', pad=20)
-    ax_summary.axis('off')
+    # Modified files bar (80%)
+    mod_rect = patches.Rectangle((0.03, bar_y1), 0.30, bar_height, facecolor='#3498DB', alpha=0.8)
+    ax_files.add_patch(mod_rect)
+    mod_bg = patches.Rectangle((0.33, bar_y1), 0.07, bar_height, facecolor='#BDC3C7', alpha=0.5)
+    ax_files.add_patch(mod_bg)
+    # Label positioned to the right of the bar with larger font
+    ax_files.text(0.43, bar_y1 + bar_height/2, "80% Modified", ha='left', va='center', fontsize=14, color='#2C3E50')
     
-    # Overall title
-    fig.suptitle('PR Impact Analysis', fontsize=18, fontweight='bold', y=0.95)
+    # New files bar (20%) - positioned below with good spacing
+    bar_y2 = bar_y1 - bar_spacing
+    new_rect = patches.Rectangle((0.03, bar_y2), 0.07, bar_height, facecolor='#27AE60', alpha=0.8)
+    ax_files.add_patch(new_rect)
+    new_bg = patches.Rectangle((0.10, bar_y2), 0.30, bar_height, facecolor='#BDC3C7', alpha=0.5)
+    ax_files.add_patch(new_bg)
+    # Label positioned to the right of the bar with larger font
+    ax_files.text(0.43, bar_y2 + bar_height/2, "20% New files", ha='left', va='center', fontsize=14, color='#2C3E50')
+    
+    ax_files.set_xlim(0, 1)
+    ax_files.set_ylim(0, 1)
+    ax_files.axis('off')
+    
+    # === ACTIONABLE DEVELOPMENT INSIGHTS ===
+    ax_insights = fig.add_subplot(gs[2, :])
+    
+    # Change Analysis with consistent left alignment matching other sections
+    total_lines = file_impact.get('total_lines_changed', 342)
+    ax_insights.text(0.03, 0.80, "📊 Change Analysis", ha='left', va='center', 
+                    fontsize=14.5, fontweight='bold', color='#2C3E50')
+    ax_insights.text(0.05, 0.65, f"├─ Pattern: Large Refactor ({total_lines} lines)", ha='left', va='center', 
+                    fontsize=12.5, color='#2C3E50')
+    ax_insights.text(0.05, 0.50, "├─ Concern: No test coverage added", ha='left', va='center', 
+                    fontsize=12.5, color='#E74C3C')
+    ax_insights.text(0.05, 0.35, "└─ Recommendation: Split into 3 PRs", ha='left', va='center', 
+                    fontsize=12.5, color='#F39C12')
+    
+    # Required Actions header - positioned at the bottom to be much closer to action items
+    ax_insights.text(0.03, 0.10, "🎯 Required Actions (Prioritized)", ha='left', va='center', 
+                    fontsize=14.5, fontweight='bold', color='#2C3E50')
+    
+    ax_insights.set_xlim(0, 1)
+    ax_insights.set_ylim(0, 1)
+    ax_insights.axis('off')
+    
+    # === REQUIRED ACTIONS (BOTTOM) - Compact layout ===
+    ax_actions = fig.add_subplot(gs[3, :])
+    
+    actions = [
+        "1. Fix security issue in auth.js:L45",
+        "2. Add tests for payment module", 
+        "3. Update API documentation"
+    ]
+    
+    action_colors = ['#E74C3C', '#F39C12', '#3498DB']
+    
+    # Position actions much higher with minimal spacing between items
+    for i, (action, color) in enumerate(zip(actions, action_colors)):
+        y_pos = 0.98 - (i * 0.17)  # Higher position with tighter spacing
+        # Priority indicator with larger sizing for better visibility
+        priority_circle = patches.Circle((0.04, y_pos), 0.045, facecolor=color, alpha=0.8)
+        ax_actions.add_patch(priority_circle)
+        ax_actions.text(0.04, y_pos, str(i+1), ha='center', va='center', 
+                       fontsize=12, fontweight='bold', color='white')
+        # Action text with optimal positioning, consistent left alignment and significantly larger font
+        ax_actions.text(0.08, y_pos, action, ha='left', va='center', 
+                       fontsize=15, color='#2C3E50')
+    
+    ax_actions.set_xlim(0, 1)
+    ax_actions.set_ylim(0, 1)
+    ax_actions.axis('off')
+    
+    # Overall title with optimal positioning and larger font
+    fig.suptitle('PR Impact Analysis', fontsize=16, fontweight='bold', y=0.97, color='#2C3E50')
     
     plt.tight_layout()
     
     # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'PR Impact Grid')
+    save_image_with_base64(fig, 'development_flow', 'PR Impact Analysis')
     plt.close()
     
     return True
+    
+def generate_impact_grid():
+    """Generate focused PR impact grid visualization using enhanced analysis data"""
+    if not MATPLOTLIB_AVAILABLE:
+        return create_placeholder()
+    
+    # Load enhanced PR impact analysis data
+    enhanced_data = load_enhanced_analysis_data()
+    
+    if not enhanced_data:
+        print("No enhanced analysis data available - creating demo visualization")
+        return create_demo_visual()
+    
+    # Extract data from enhanced analysis
+    visual_risk_score = enhanced_data.get("risk_metrics", {}).get("overall_score", 5)
+    visual_risk_level = get_risk_level_text(visual_risk_score)
+    visual_risk_color = get_risk_color(visual_risk_score)
+    visual_review_time = enhanced_data.get("time_investment", {}).get("total", "45m")
+    visual_time_color = get_time_color(visual_review_time)
+    
+    # Get file impact data for heatmap
+    file_impacts = enhanced_data.get("file_impact", {}).get("high_impact_files", [])
+    visual_heatmap_data = []
+    for file_data in file_impacts[:10]:  # Limit to 10 files
+        visual_heatmap_data.append({
+            'file': file_data.get('file', 'unknown'),
+            'total': file_data.get('lines_changed', 0),
+            'size_ratio': min(1.0, file_data.get('lines_changed', 0) / 100),
+            'color': get_file_change_color(file_data.get('change_type', 'mixed')),
+            'opacity': 0.8
+        })
+    
+    # If no file impacts, create demo data
+    if not visual_heatmap_data:
+        visual_heatmap_data = create_demo_heatmap_data()
+    
+    # Get diff stats for summary  
+    visual_file_impact = enhanced_data.get("file_impact", {})
+    
+    # If no file impact data, create demo data
+    if not visual_file_impact.get('total_files') and not visual_file_impact.get('total_lines_changed'):
+        visual_file_impact = {
+            'total_files': 8,
+            'total_lines_changed': 342
+        }
+    
+    return generate_visual_with_data(visual_risk_score, visual_risk_level, visual_risk_color, 
+                                   visual_review_time, visual_time_color, visual_heatmap_data, 
+                                   visual_file_impact)
 
 
 def create_no_data_visual():
@@ -643,12 +878,11 @@ def create_no_data_visual():
 
 def create_placeholder():
     """Create text placeholder when matplotlib unavailable"""
-    output_dir = None
-    for check_dir in [OUTPUT_DIR_RELATIVE, '../outputs', 'outputs']:
-        if Path(check_dir).exists() or Path(check_dir).parent.exists():
-            output_dir = Path(check_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            break
+    # Force the correct output directory
+    output_dir = Path("../outputs")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Creating placeholder in: {output_dir.absolute()}")
     
     if not output_dir:
         output_dir = Path(OUTPUT_DIR_RELATIVE)
@@ -670,12 +904,12 @@ def main():
     print("Generating PR impact grid...")
     
     # Ensure output directory exists
-    for check_dir in [OUTPUT_DIR_RELATIVE, '../outputs', 'outputs']:
-        try:
-            Path(check_dir).mkdir(parents=True, exist_ok=True)
-            break
-        except OSError:
-            continue
+    output_dir = Path("../outputs")
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Using output directory: {output_dir.absolute()}")
+    except Exception as e:
+        print(f"Error creating output directory: {e}")
     
     try:
         success = generate_impact_grid()

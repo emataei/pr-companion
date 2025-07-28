@@ -282,7 +282,7 @@ def create_enhanced_visualization():
         with open(output_dir / 'pr_impact_summary.md', 'w', encoding='utf-8') as f:
             f.write(markdown_content)
         
-        print(f"Enhanced PR impact analysis generated successfully")
+        # Quiet success - only output if error
         return True
         
     except Exception as e:
@@ -350,9 +350,7 @@ def main():
     """Main function"""
     try:
         success = create_enhanced_visualization()
-        if success:
-            print("Enhanced PR impact analysis complete!")
-        else:
+        if not success:
             print("Failed to generate enhanced analysis")
             sys.exit(1)
             
