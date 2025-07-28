@@ -108,6 +108,12 @@ function buildComment(results) {
     comment += recommendationsSection;
   }
 
+  // Enhanced PR impact analysis (new visual design)
+  const impactAnalysisSection = buildImpactAnalysisSection();
+  if (impactAnalysisSection) {
+    comment += impactAnalysisSection;
+  }
+
   // Footer
   comment += `---\n*AI pre-review analysis • Priority: First reviewer focus*`;
 
@@ -336,6 +342,25 @@ function buildRecommendationsSection() {
     return ''; // No recommendations available
   } catch (error) {
     console.log('Could not load smart recommendations:', error.message);
+    return '';
+  }
+}
+
+function buildImpactAnalysisSection() {
+  try {
+    // Load enhanced PR impact analysis if available
+    const fs = require('fs');
+    const path = require('path');
+    const impactPath = path.join('.code-analysis', 'outputs', 'pr_impact_summary.md');
+    
+    if (fs.existsSync(impactPath)) {
+      const content = fs.readFileSync(impactPath, 'utf-8');
+      return content + '\n';
+    }
+    
+    return ''; // No impact analysis available
+  } catch (error) {
+    console.log('Could not load PR impact analysis:', error.message);
     return '';
   }
 }

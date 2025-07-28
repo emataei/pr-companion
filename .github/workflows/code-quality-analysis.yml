@@ -127,6 +127,11 @@ jobs:
         run: python .code-analysis/scripts/generate_smart_recommendations.py
         continue-on-error: true
 
+      - name: Generate Enhanced PR Impact Analysis
+        if: github.event_name == 'pull_request'
+        run: python .code-analysis/scripts/generate_enhanced_pr_impact.py
+        continue-on-error: true
+
       # POST COMMENTS IN PRIORITY ORDER
       # Quality Gate is now integrated into AI Pre-Review Analysis
       # - name: Post Quality Gate Comment (1st - Blocking Issues)

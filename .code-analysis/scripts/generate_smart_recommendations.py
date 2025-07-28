@@ -273,7 +273,7 @@ def main():
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        print(f"Smart recommendations written to {output_file}")
+        # Quiet success - only output if verbose mode or error
         
     except Exception as e:
         print(f"Error in main: {e}")
