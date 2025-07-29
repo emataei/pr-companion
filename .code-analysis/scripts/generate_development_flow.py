@@ -144,12 +144,14 @@ def calculate_risk_score():
         # Convert to 1-10 scale and categorize
         risk_score = min(10, max(1, risk_score))
         
-        if risk_score >= 7:
-            return risk_score, "High", "#E74C3C"  # Red
-        elif risk_score >= 4:
-            return risk_score, "Medium", "#F39C12"  # Orange
+        if risk_score >= 8:
+            return risk_score, "CRITICAL", "#E74C3C"  # Red
+        elif risk_score >= 5:
+            return risk_score, "HIGH", "#F39C12"  # Orange
+        elif risk_score >= 3:
+            return risk_score, "MEDIUM", "#F1C40F"  # Yellow
         else:
-            return risk_score, "Low", "#2ECC71"  # Green
+            return risk_score, "LOW", "#2ECC71"  # Green
             
     except Exception as e:
         print(f"Error calculating risk score: {e}")
@@ -484,6 +486,104 @@ def get_time_color(review_time):
         return "#2ECC71"  # Green for under 1 hour
 
 
+def create_consistent_risk_categories(diff_stats, overall_risk_score):
+    """Create file risk categories that are consistent with the overall risk score"""
+    if not diff_stats:
+        return {
+            'high_risk': {'count': 0, 'files': []},
+            'medium_risk': {'count': 0, 'files': []},
+            'low_risk': {'count': 0, 'files': []}
+        }
+    
+    high_risk_extensions = {'.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.cpp', '.cs'}
+    config_extensions = {'.json', '.yaml', '.yml', '.xml', '.config'}
+    
+    high_risk_files = []
+    medium_risk_files = []
+    low_risk_files = []
+    
+    # Sort files by total changes to prioritize
+    sorted_files = sorted(diff_stats, key=lambda x: x['total'], reverse=True)
+    
+    for file_data in sorted_files:
+        file_path = file_data['file']
+        total_changes = file_data['total']
+        file_ext = Path(file_path).suffix.lower()
+        
+        # Determine risk level based on multiple factors
+        risk_factors = 0
+        reasons = []
+        
+        # Factor 1: File type
+        if file_ext in high_risk_extensions:
+            risk_factors += 2
+            reasons.append("critical code file")
+        elif file_ext in config_extensions:
+            risk_factors += 1
+            reasons.append("configuration file")
+        
+        # Factor 2: Change volume
+        if total_changes > 100:
+            risk_factors += 2
+            reasons.append(f"{total_changes} lines changed")
+        elif total_changes > 50:
+            risk_factors += 1
+            reasons.append(f"{total_changes} lines changed")
+        
+        # Factor 3: Deletion ratio (high deletions = higher risk)
+        deletions = file_data.get('deletions', 0)
+        if total_changes > 0:
+            deletion_ratio = deletions / total_changes
+            if deletion_ratio > 0.5:
+                risk_factors += 1
+                reasons.append("high deletion ratio")
+        
+        # Factor 4: Path complexity (deep nesting may indicate core files)
+        path_depth = len(Path(file_path).parts)
+        if path_depth > 3:
+            risk_factors += 1
+            reasons.append("deep path structure")
+        
+        # Categorize based on risk factors
+        reason_text = ", ".join(reasons) if reasons else "minor changes"
+        file_info = {
+            'file': Path(file_path).name,
+            'full_path': file_path,
+            'reason': reason_text,
+            'changes': total_changes
+        }
+        
+        if risk_factors >= 3:
+            high_risk_files.append(file_info)
+        elif risk_factors >= 1:
+            medium_risk_files.append(file_info)
+        else:
+            low_risk_files.append(file_info)
+    
+    # If overall risk is high but we have no high-risk files, promote some medium-risk files
+    if overall_risk_score >= 5 and len(high_risk_files) == 0 and len(medium_risk_files) > 0:
+        # Promote the top medium-risk files to high-risk
+        files_to_promote = min(2, len(medium_risk_files))
+        for _ in range(files_to_promote):
+            file_info = medium_risk_files.pop(0)
+            file_info['reason'] = f"high overall PR risk, {file_info['reason']}"
+            high_risk_files.append(file_info)
+    
+    # If overall risk is medium but we have no medium-risk files, promote some low-risk files
+    elif overall_risk_score >= 3 and len(medium_risk_files) == 0 and len(low_risk_files) > 0:
+        files_to_promote = min(2, len(low_risk_files))
+        for _ in range(files_to_promote):
+            file_info = low_risk_files.pop(0)
+            file_info['reason'] = f"medium overall PR risk, {file_info['reason']}"
+            medium_risk_files.append(file_info)
+    
+    return {
+        'high_risk': {'count': len(high_risk_files), 'files': high_risk_files},
+        'medium_risk': {'count': len(medium_risk_files), 'files': medium_risk_files},
+        'low_risk': {'count': len(low_risk_files), 'files': low_risk_files}
+    }
+
+
 def get_file_change_color(change_type):
     """Get color for file change type"""
     colors = {
@@ -597,8 +697,19 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_files.text(0.5, 0.9, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
                  fontsize=16, fontweight='bold', color='#2C3E50')
     
-    # Get risk categories from file_impact data
+    # Get or create consistent risk categories based on overall risk score
     risk_categories = file_impact.get('risk_categories', {})
+    
+    # If risk categories are empty or inconsistent, create consistent ones
+    if (not risk_categories or 
+        (risk_score >= 5 and risk_categories.get('high_risk', {}).get('count', 0) == 0) or
+        (risk_score >= 3 and risk_categories.get('medium_risk', {}).get('count', 0) == 0 and 
+         risk_categories.get('high_risk', {}).get('count', 0) == 0)):
+        
+        # Load diff stats to create consistent categories
+        diff_stats = load_diff_stats()
+        risk_categories = create_consistent_risk_categories(diff_stats, risk_score)
+    
     high_risk_count = risk_categories.get('high_risk', {}).get('count', 0)
     medium_risk_count = risk_categories.get('medium_risk', {}).get('count', 0)
     low_risk_count = risk_categories.get('low_risk', {}).get('count', 0)
@@ -682,19 +793,18 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     if enhanced_data and 'actionable_items' in enhanced_data:
         actionable_items = enhanced_data['actionable_items']
         for i, item in enumerate(actionable_items[:3]):  # Limit to top 3 for visual space
-            icon = item.get('icon', '•')
             title = item.get('title', 'Review required')
             effort = item.get('effort', '?')
             blocking = item.get('blocking', False)
-            blocking_text = " ⚠️" if blocking else ""
-            action_text = f"{i+1}. {icon} {title} ({effort}){blocking_text}"
+            blocking_text = " WARNING" if blocking else ""
+            action_text = f"{i+1}. {title} ({effort}){blocking_text}"
             actions.append(action_text)
     else:
         # Fallback actions if no enhanced data available
         actions = [
-            "1. 🔍 Review changed files for quality",
-            "2. 🧪 Ensure test coverage is adequate", 
-            "3. 📝 Update documentation if needed"
+            "1. Review changed files for quality",
+            "2. Ensure test coverage is adequate", 
+            "3. Update documentation if needed"
         ]
     
     for i, action in enumerate(actions):
@@ -706,6 +816,11 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_actions.set_xlim(0, 1)
     ax_actions.set_ylim(0, 1)
     ax_actions.axis('off')
+    
+    # Add timestamp to bottom right corner to ensure unique content
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    fig.text(0.98, 0.02, f"Updated: {current_time}", ha='right', va='bottom', 
+             fontsize=8, color='#7F8C8D', alpha=0.7)
     
     # Clean title
     fig.suptitle('PR Impact Analysis', fontsize=18, fontweight='bold', y=0.95, color='#2C3E50')

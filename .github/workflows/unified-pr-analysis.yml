@@ -675,15 +675,17 @@ jobs:
           echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
           # Store URLs in a file for the comment scripts
           mkdir -p .code-analysis/outputs
+          TIMESTAMP=$(date +%s)
+          RANDOM_ID=$(shuf -i 1000-9999 -n 1)
           cat > .code-analysis/outputs/visual_urls.json << EOF
           {
             "base_url": "${BASE_URL}",
             "pr_number": "${PR_NUM}",
             "urls": {
-              "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
-              "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
-              "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
-              "index": "${BASE_URL}/pr/${PR_NUM}/index.html"
+              "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
+              "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
+              "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
+              "index": "${BASE_URL}/pr/${PR_NUM}/index.html?v=${TIMESTAMP}&r=${RANDOM_ID}"
             }
           }
           EOF
@@ -722,17 +724,25 @@ jobs:
 
       - name: Wait for GitHub Pages deployment
         run: |
-          echo "Waiting 30 seconds for GitHub Pages to propagate..."
-          sleep 30
-
-      - name: Comment PR with GitHub Pages hosted visuals
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
-            return await script({ github, context });
+          echo "Waiting 60 seconds for GitHub Pages to propagate..."
+          sleep 60
+          
+          # Verify that the image is accessible
+          echo "Verifying image accessibility..."
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          PR_NUM="${{ github.event.pull_request.number }}"
+          IMAGE_URL="${BASE_URL}/pr/${PR_NUM}/development_flow.png"
+          
+          # Try to access the image with retries
+          for i in {1..3}; do
+            if curl -s --head "$IMAGE_URL" | grep -q "200 OK"; then
+              echo "✅ Image is accessible at: $IMAGE_URL"
+              break
+            else
+              echo "⏳ Attempt $i: Image not yet accessible, waiting 30 more seconds..."
+              sleep 30
+            fi
+          done
 
       - name: Comment PR with documentation suggestions
         if: always()
@@ -741,4 +751,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const script = require('./.code-analysis/scripts/documentation-suggestions-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Comment PR with GitHub Pages hosted visuals
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
             return await script({ github, context });
