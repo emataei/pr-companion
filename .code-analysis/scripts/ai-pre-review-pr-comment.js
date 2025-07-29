@@ -152,10 +152,11 @@ function getRiskLevel(riskLevel) {
 
 function buildSummarySection(results) {
   const summary = results.ai_analysis.summary;
-  // Use smart truncation for better readability
-  const shortSummary = smartTruncate(summary, 300);
+  // Use longer truncation for bulleted summaries to avoid cutting mid-bullet
+  // Also preserve bullet point formatting
+  const expandedSummary = smartTruncate(summary, 600);
   
-  return `**Summary:** ${shortSummary}\n\n`;
+  return `**Summary:**\n${expandedSummary}\n\n`;
 }
 
 function buildCategoriesSection(results) {
