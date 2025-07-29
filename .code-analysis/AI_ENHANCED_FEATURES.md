@@ -221,7 +221,7 @@ Add to `.github/workflows/quality-gate.yml`:
 
 1. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   pip install -r .github/requirements.txt
    ```
 
 2. **Set environment variables**:

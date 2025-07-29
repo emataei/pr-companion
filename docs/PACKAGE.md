@@ -15,9 +15,9 @@
 📁 .github/workflows/        # 3 automation workflows
 ├── ai-cognitive-analysis.yml      # AI analysis + comments
 ├── code-quality-analysis.yml      # Quality gates + scoring  
-└── pr-visuals-and-docs.yml        # Visual analysis + docs
+├── pr-visuals-and-docs.yml        # Visual analysis + docs
+└── requirements.txt              # Python dependencies for workflows
 
-📄 requirements.txt          # Python dependencies
 📄 README.md                 # Usage guide
 📄 SETUP.md                  # 5-minute setup guide
 📁 docs/                     # Label reference guides

@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r .github/requirements.txt
           # Install system dependencies for visualization
           sudo apt-get update
           sudo apt-get install -y graphviz graphviz-dev
@@ -108,8 +108,17 @@ jobs:
           echo "Running story arc script..."
           python .code-analysis/scripts/generate_story_arc.py
       - name: Generate enhanced visuals report
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          echo "Generating enhanced visuals report with embedded images..."
+          echo "Generating enhanced visuals report with dynamic GitHub Pages URLs..."
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "PR Number: $GITHUB_PR_NUMBER"
+          echo "Commit SHA: $GITHUB_SHA"
           if [ -f ".code-analysis/scripts/generate-embedded-visuals.js" ]; then
             node .code-analysis/scripts/generate-embedded-visuals.js
             # Validate report size
@@ -155,30 +164,58 @@ jobs:
           rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.svg
           rm -f gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
           
-          # Copy all generated PNG and GIF files to gh-pages
+          # Copy all generated PNG and GIF files to gh-pages with commit hash for cache busting
           if [ -d ".code-analysis/outputs" ]; then
-            echo "Copying visual files to gh-pages..."
+            echo "Copying visual files to gh-pages with commit hash..."
             # List what files are available
             echo "Available output files:"
             ls -la .code-analysis/outputs/
-            # Copy PNG files
+            
+            COMMIT_SHA="${{ github.sha }}"
+            SHORT_SHA="${COMMIT_SHA:0:8}"
+            
+            # Copy PNG files with commit hash
             if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied PNG files"
+              for file in .code-analysis/outputs/*.png; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No PNG files found"
             fi
-            # Copy GIF files
+            # Copy GIF files with commit hash
             if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied GIF files"
+              for file in .code-analysis/outputs/*.gif; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No GIF files found"
             fi
-            # Copy SVG files
+            # Copy SVG files with commit hash
             if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied SVG files"
+              for file in .code-analysis/outputs/*.svg; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No SVG files found"
             fi
@@ -402,6 +439,12 @@ jobs:
           script: |
             const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
             return await script({ github, context });
+      - name: Wait for GitHub Pages deployment
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Waiting 30 seconds for GitHub Pages to propagate..."
+          sleep 30
+
       - name: Comment PR with GitHub Pages hosted visuals
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7

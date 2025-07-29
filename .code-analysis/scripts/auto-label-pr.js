@@ -12,6 +12,12 @@ async function autoLabelPR({ github, context }) {
     return;
   }
 
+  // Check if we have proper context
+  if (!context.repo || !context.repo.owner || !context.repo.repo) {
+    console.log('Missing repository context, skipping auto-labeling');
+    return;
+  }
+
   console.log(`Setting reviewer-centric labels for PR #${prNumber}`);
   
   const labels = new Set();
@@ -329,6 +335,11 @@ function findQualityResults() {
  */
 async function getPRStats(github, context, prNumber) {
   try {
+    if (!context.repo || !context.repo.owner || !context.repo.repo) {
+      console.log('Missing repository context for PR stats');
+      return { additions: 0, deletions: 0, changed_files: 0 };
+    }
+    
     const { data: pr } = await github.rest.pulls.get({
       owner: context.repo.owner,
       repo: context.repo.repo,
@@ -351,6 +362,11 @@ async function getPRStats(github, context, prNumber) {
  */
 async function getChangedFiles(github, context, prNumber) {
   try {
+    if (!context.repo || !context.repo.owner || !context.repo.repo) {
+      console.log('Missing repository context for changed files');
+      return [];
+    }
+    
     const { data: files } = await github.rest.pulls.listFiles({
       owner: context.repo.owner,
       repo: context.repo.repo,

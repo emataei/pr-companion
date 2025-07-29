@@ -51,7 +51,7 @@ An intelligent, tiered review system that:
 
 1. **Set up AI provider** (Azure AI Foundry or OpenAI)
 2. **Copy `.code-analysis` and `.github` folders** to your repository
-3. **Install dependencies** (pip install -r requirements.txt)
+3. **Install dependencies** (pip install -r .github/requirements.txt)
 4. **Enable workflows** - they run automatically on PRs
 
 The system is **100% portable** - just drop the folders into any repository and it works.

@@ -93,7 +93,6 @@ cognitive_analysis.json
 # Virtual environments and local libraries
 venv*/
 Lib/
-Scripts/
 Include/
 
 # Local visual testing and sample files
