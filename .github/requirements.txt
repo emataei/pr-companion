@@ -2,28 +2,23 @@
 azure-ai-inference==1.0.0b9
 azure-identity
 PyGithub
-sonarqube-api
-pylint
-GitPython
-
-# Additional analysis dependencies
 requests
-pathlib2; python_version < '3.4'
-
-# AI-enhanced analysis tools
-# For Python AST parsing and code analysis
-ast-decompiler
+GitPython
 
 # For dependency graph visualization
 graphviz
 networkx>=2.8.0
 
-# Visual chart generation dependencies
+# Visual chart generation dependencies (optimized list)
 matplotlib>=3.5.0
-seaborn>=0.11.0
-Pillow>=8.0.0
-pandas>=1.3.0
 numpy>=1.21.0
 
-# For enhanced regex patterns in TypeScript/JavaScript analysis
-regex
+# Removed unused packages:
+# - sonarqube-api (not used in current scripts)
+# - pylint (not directly imported)
+# - pathlib2 (only needed for Python < 3.4)
+# - ast-decompiler (not used in current scripts)
+# - seaborn (not used in current scripts)
+# - Pillow (not directly imported, matplotlib handles images)
+# - pandas (not used in current scripts)
+# - regex (using built-in re module instead)

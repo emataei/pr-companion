@@ -1,0 +1,698 @@
+name: Unified PR Analysis
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write  # Needed for GitHub Pages deployment
+  pull-requests: write
+  issues: write
+
+jobs:
+  # Job 1: Code Quality Analysis (Primary - runs first)
+  code-quality-analysis:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    outputs:
+      artifacts-exist: ${{ steps.check-artifacts.outputs.artifacts-exist }}
+      pr-number: ${{ github.event.pull_request.number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .github/requirements.txt
+          # Install system dependencies for visual graph generation
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+      
+      - name: Install Node.js dependencies for dependency analysis
+        run: |
+          npm install -g madge
+          # Install other useful analysis tools
+          npm install -g dependency-cruiser
+      
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.mjs
+            **/*.cjs
+            **/*.vue
+            **/*.svelte
+            **/*.java
+            **/*.cs
+            **/*.go
+            **/*.rs
+            sample-project/**/*.js
+            sample-project/**/*.ts
+            sample-project/**/*.jsx
+            sample-project/**/*.tsx
+          files_ignore: |
+            **/*.md
+            **/*.txt
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            **/Dockerfile
+            **/node_modules/**
+            **/dist/**
+            **/build/**
+      
+      - name: Debug changed files
+        run: |
+          echo "=== Changed Files Debug ==="
+          echo "All changed files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+          echo "Number of changed files: ${{ steps.changed-files.outputs.all_changed_files_count }}"
+          echo "Changed files (space-separated):"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}" | tr ' ' '\n'
+          echo "=== End Debug ==="
+      
+      - name: Run Quality Gate Analysis
+        id: quality-check
+        run: |
+          echo "Running Quality Gate Analysis..."
+          echo "Changed files from GitHub Actions: '${{ steps.changed-files.outputs.all_changed_files }}'"
+          echo "Number of changed files: ${{ steps.changed-files.outputs.all_changed_files_count }}"
+          
+          if [ -z "${{ steps.changed-files.outputs.all_changed_files }}" ] || [ "${{ steps.changed-files.outputs.all_changed_files_count }}" = "0" ]; then
+            echo "No changed files detected by GitHub Actions. Running quality gate anyway."
+          fi
+          echo "Using detected changed files from GitHub Actions: ${{ steps.changed-files.outputs.all_changed_files }}"
+          export CHANGED_FILES="${{ steps.changed-files.outputs.all_changed_files }}"
+          python .code-analysis/scripts/run_quality_gate.py
+        env:
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+        continue-on-error: true
+
+      - name: Generate Dependency Graph Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          python .code-analysis/scripts/dependency_graph_generator.py \
+            --repo . \
+            --before ${{ github.event.pull_request.base.sha }} \
+            --after ${{ github.event.pull_request.head.sha }} \
+            --pr-output
+        continue-on-error: true
+
+      - name: Generate Smart Recommendations
+        run: python .code-analysis/scripts/generate_smart_recommendations.py
+        continue-on-error: true
+
+      - name: Generate Enhanced PR Impact Analysis
+        run: python .code-analysis/scripts/generate_enhanced_pr_impact.py
+        continue-on-error: true
+
+      - name: Auto-label PR based on quality analysis
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/auto-label-pr.js');
+            return await script({ github, context });
+
+      - name: Check for generated artifacts
+        id: check-artifacts
+        run: |
+          if ls dependency_graph_pr.png *.html *.txt 2>/dev/null; then
+            echo "artifacts-exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "artifacts-exist=false" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
+      - name: Upload Quality Gate Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: quality-gate-results.json
+        if: always()
+
+      - name: Upload Technical Analysis Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: technical-analysis-results
+          path: |
+            dependency_graph_pr.png
+            *.html
+            *.txt
+        if: always() && steps.check-artifacts.outputs.artifacts-exist == 'true'
+
+  # Job 2: AI Cognitive Analysis (Depends on code-quality-analysis)
+  ai-cognitive-analysis:
+    name: AI Cognitive Analysis
+    runs-on: ubuntu-latest
+    needs: code-quality-analysis
+    outputs:
+      pr-number: ${{ needs.code-quality-analysis.outputs.pr-number }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download quality analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: ./quality-results/
+        continue-on-error: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .github/requirements.txt
+          # Install Azure AI dependencies for cognitive analysis
+          pip install azure-ai-inference azure-identity
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.py
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.mjs
+            **/*.cjs
+            **/*.vue
+            **/*.svelte
+            **/*.java
+            **/*.cs
+            **/*.go
+            **/*.rs
+            sample-project/**/*.js
+            sample-project/**/*.ts
+            sample-project/**/*.jsx
+            sample-project/**/*.tsx
+          files_ignore: |
+            **/*.md
+            **/*.txt
+            **/*.yml
+            **/*.yaml
+            **/*.json
+            **/Dockerfile
+            **/node_modules/**
+            **/dist/**
+            **/build/**
+
+      - name: Analyze PR Cognitive Complexity
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/run_cognitive_analysis.py
+          echo "Cognitive complexity analysis complete"
+        continue-on-error: true
+
+      - name: Run AI Pre-Review Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/ai_pre_review.py
+          echo "AI-generated analysis for review triage (uses cognitive results)"
+        continue-on-error: true
+
+      - name: Run Intent Classification Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/intent_classifier.py \
+            --repo . \
+            --title "${{ github.event.pull_request.title }}" \
+            --description "${{ github.event.pull_request.body }}" \
+            --pr-output
+          echo "AI-generated intent classification analysis"
+        continue-on-error: true
+
+      - name: Run Impact Prediction Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/impact_predictor.py \
+            --repo . \
+            --pr-title "${{ github.event.pull_request.title }}" \
+            --pr-description "${{ github.event.pull_request.body }}" \
+            --pr-output
+          echo "AI-generated impact prediction analysis"
+        continue-on-error: true
+
+      - name: Generate Semantic Commit Story
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python .code-analysis/scripts/semantic_commit_analyzer.py
+          echo "AI-generated semantic commit story"
+        continue-on-error: true
+
+      # POST AI ANALYSIS COMMENTS IN PRIORITY ORDER
+      - name: Post AI Pre-Review Comment (1st - Priority)
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/ai-pre-review-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post Cognitive Complexity Comment (2nd)
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/cognitive-analysis-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Update PR Description with Semantic Story
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/semantic-commit-pr-description.js');
+            return await script({ github, context });
+
+      - name: Upload AI Analysis Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-cognitive-analysis-results
+          path: |
+            ai_pre_review.json
+            cognitive_analysis.json
+            intent_classification.json
+            impact_prediction.json
+            semantic_commit_analysis.json
+        if: always()
+
+  # Job 3: PR Visuals and Documentation (Depends on code-quality-analysis)
+  pr-visuals-and-docs:
+    name: PR Visuals and Documentation
+    runs-on: ubuntu-latest
+    needs: code-quality-analysis
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Download code quality analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: ./.code-analysis/outputs/
+        continue-on-error: true
+        
+      - name: Download AI cognitive analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-cognitive-analysis-results
+          path: ./
+        continue-on-error: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create output directories
+        run: |
+          mkdir -p .code-analysis/outputs
+          mkdir -p .github/scripts
+          # Clear old outputs to ensure fresh generation
+          rm -f .code-analysis/outputs/*.png
+          rm -f .code-analysis/outputs/*.gif
+          rm -f .code-analysis/outputs/*.svg
+          echo "Created clean output directories"
+          
+      - name: Verify analysis artifacts
+        run: |
+          echo "Checking for downloaded analysis results..."
+          echo "Code quality results:"
+          ls -la .code-analysis/outputs/ | grep -E "(quality|gate)" || echo "No quality gate results found"
+          echo "AI cognitive results:"
+          ls -la . | grep -E "(cognitive|ai_pre)" || echo "No cognitive analysis results found"
+          echo "Current working directory contents:"
+          find .code-analysis/outputs -name "*.json" -exec echo "Found: {}" \;
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r .github/requirements.txt
+          # Install system dependencies for visualization
+          sudo apt-get update
+          sudo apt-get install -y graphviz graphviz-dev
+          # Install global tools
+          npm install -g madge
+          echo "Dependencies installed successfully"
+
+      - name: Auto-detect project structure
+        id: detect-structure
+        run: python .code-analysis/scripts/detect_project_structure.py
+        env:
+          GITHUB_OUTPUT: ${{ runner.temp }}/github_output
+
+      - name: Install project dependencies
+        run: python .code-analysis/scripts/install_project_dependencies.py
+        env:
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          HAS_PACKAGE_JSON: ${{ steps.detect-structure.outputs.has_package_json }}
+
+      - name: Get changed files for analysis
+        id: changed-files
+        uses: tj-actions/changed-files@v41
+        with:
+          files: |
+            **/*.js
+            **/*.ts
+            **/*.jsx
+            **/*.tsx
+            **/*.vue
+            **/*.json
+            **/*.md
+            **/*.yml
+            **/*.yaml
+
+      - name: Generate diff stats
+        run: |
+          git diff --numstat origin/${{ github.base_ref }} > .code-analysis/outputs/diff_stats.txt
+          echo "Diff stats generated:"
+          head -10 .code-analysis/outputs/diff_stats.txt
+
+      - name: Generate dependency graphs
+        run: python .code-analysis/scripts/generate_dependency_graphs.py
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
+          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
+          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
+
+      - name: Generate enhanced PR impact analysis
+        run: |
+          echo "Generating enhanced PR impact analysis data..."
+          python .code-analysis/scripts/generate_enhanced_pr_impact.py
+
+      - name: Generate development flow
+        run: |
+          echo "Running development flow script..."
+          python .code-analysis/scripts/generate_development_flow.py
+
+      - name: Generate story arc animation
+        run: |
+          echo "Running story arc script..."
+          python .code-analysis/scripts/generate_story_arc.py
+
+      - name: Generate enhanced visuals report
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          echo "Generating enhanced visuals report with dynamic GitHub Pages URLs..."
+          if [ -f ".code-analysis/scripts/generate-embedded-visuals.js" ]; then
+            node .code-analysis/scripts/generate-embedded-visuals.js
+          else
+            echo "Enhanced visuals script not found"
+            mkdir -p .code-analysis/outputs
+            echo "# Enhanced Visuals Report" > .code-analysis/outputs/enhanced_image_report.md
+            echo "Enhanced visuals script was not found in the repository." >> .code-analysis/outputs/enhanced_image_report.md
+          fi
+
+      - name: Generate documentation suggestions
+        run: |
+          echo "Analyzing documentation needs..."
+          python .code-analysis/scripts/generate_concise_documentation_suggestions.py
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
+          # Azure AI Foundry configuration (optional - will fallback to rule-based if not set)
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL || 'gpt-4o' }}
+
+      - name: Prepare GitHub Pages deployment
+        run: |
+          echo "Preparing GitHub Pages deployment for PR visuals..."
+          # Setup GitHub Pages structure
+          python .code-analysis/scripts/setup_github_pages.py
+          # Create the gh-pages directory structure for this PR
+          mkdir -p gh-pages/pr/${{ github.event.pull_request.number }}
+          
+          # IMPORTANT: Remove old PR files first to force regeneration
+          echo "Removing old PR files to ensure fresh content..."
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.png
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.gif
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.svg
+          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+          
+          # Copy all generated PNG and GIF files to gh-pages with commit hash for cache busting
+          if [ -d ".code-analysis/outputs" ]; then
+            echo "Copying visual files to gh-pages with commit hash..."
+            # List what files are available
+            echo "Available output files:"
+            ls -la .code-analysis/outputs/
+            
+            COMMIT_SHA="${{ github.sha }}"
+            SHORT_SHA="${COMMIT_SHA:0:8}"
+            
+            # Copy PNG files with commit hash
+            if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
+              for file in .code-analysis/outputs/*.png; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
+            else
+              echo "No PNG files found"
+            fi
+            # Copy GIF files with commit hash
+            if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
+              for file in .code-analysis/outputs/*.gif; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
+            else
+              echo "No GIF files found"
+            fi
+            # Copy SVG files with commit hash
+            if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
+              for file in .code-analysis/outputs/*.svg; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
+            else
+              echo "No SVG files found"
+            fi
+            
+            # Create a simple test file to verify deployment
+            echo "Creating test file for deployment verification..."
+            echo "This is a test file created at $(date) - Update: ${{ github.run_number }}" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+            echo "Test file created with content: $(cat gh-pages/pr/${{ github.event.pull_request.number }}/test.txt)"
+          else
+            echo "No outputs directory found"
+          fi
+          
+          # Create an index.html for the PR
+          cat > gh-pages/pr/${{ github.event.pull_request.number }}/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>PR #${{ github.event.pull_request.number }} Visuals</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .visual { margin: 20px 0; text-align: center; }
+                  img { max-width: 100%; height: auto; border: 1px solid #ddd; }
+                  h1 { color: #333; }
+                  .timestamp { font-size: 12px; color: #666; margin-top: 20px; }
+              </style>
+          </head>
+          <body>
+              <h1>PR #${{ github.event.pull_request.number }} Visual Analysis</h1>
+              <div class="visual">
+                  <h2>PR Impact Grid</h2>
+                  <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>   
+                  <img src="development_flow.png?v=${{ github.run_number }}" alt="PR Impact Grid" />
+              </div>
+              <div class="visual">
+                  <h2>Story Arc</h2>
+                  <img src="story_arc.png?v=${{ github.run_number }}" alt="Story Arc" />
+              </div>
+              <div class="visual">
+                  <h2>PR Dependencies</h2>
+                  <img src="dependency_graph_pr.png?v=${{ github.run_number }}" alt="PR Dependency Graph" />
+              </div>
+              <div class="timestamp">Last updated: $(date) - Run #${{ github.run_number }}</div>
+          </body>
+          </html>
+          EOF
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          keep_files: true
+          commit_message: "Deploy PR #${{ github.event.pull_request.number }} visuals"
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          enable_jekyll: false
+          force_orphan: false
+          destination_dir: '.'  # Deploy to root of gh-pages branch
+
+      - name: Create PR visual URLs
+        id: visual-urls
+        run: |
+          # Generate the GitHub Pages URLs for the images
+          BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"       
+          PR_NUM="${{ github.event.pull_request.number }}"
+          echo "base_url=${BASE_URL}" >> $GITHUB_OUTPUT
+          echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
+          echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
+          echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
+          echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
+          # Store URLs in a file for the comment scripts
+          mkdir -p .code-analysis/outputs
+          cat > .code-analysis/outputs/visual_urls.json << EOF
+          {
+            "base_url": "${BASE_URL}",
+            "pr_number": "${PR_NUM}",
+            "urls": {
+              "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png",
+              "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png",
+              "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png",
+              "index": "${BASE_URL}/pr/${PR_NUM}/index.html"
+            }
+          }
+          EOF
+          echo "Visual URLs created and saved to visual_urls.json"
+          cat .code-analysis/outputs/visual_urls.json
+
+      - name: Upload all visual artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr-visuals-and-docs
+          path: |
+            .code-analysis/outputs/dependency_graph_pr.png
+            .code-analysis/outputs/development_flow.png
+            .code-analysis/outputs/story_arc.png
+            .code-analysis/outputs/enhanced_image_report.md
+            .code-analysis/outputs/documentation_suggestions.md
+            .code-analysis/outputs/diff_stats.txt
+            .code-analysis/outputs/enhanced_visuals_results.json
+            .code-analysis/outputs/documentation_analysis.json
+            .code-analysis/outputs/*.svg
+            .code-analysis/outputs/*.json
+            .code-analysis/outputs/*.md
+            .code-analysis/outputs/*.png
+            .code-analysis/outputs/*.gif
+          retention-days: 30
+
+      - name: Cleanup old visual comments
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
+            return await script({ github, context });
+
+      - name: Wait for GitHub Pages deployment
+        run: |
+          echo "Waiting 30 seconds for GitHub Pages to propagate..."
+          sleep 30
+
+      - name: Comment PR with GitHub Pages hosted visuals
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Comment PR with documentation suggestions
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/documentation-suggestions-pr-comment.js');
+            return await script({ github, context });
