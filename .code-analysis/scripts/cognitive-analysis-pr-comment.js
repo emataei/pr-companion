@@ -107,27 +107,18 @@ function buildCategorySection(results) {
   const categories = results.complexity_categories;
   if (!categories) return '';
   
-  let section = `### Complexity Breakdown\n`;
-  section += `| Category | Levels |\n`;
-  section += `|----------|--------|\n`;
+  // Find the highest complexity level for a quick summary
+  const levels = Object.values(categories);
+  const hasHigh = levels.some(level => level === 'HIGH' || level === 'VERY HIGH');
+  const hasMedium = levels.some(level => level === 'MEDIUM');
   
-  const categoryNames = {
-    architectural: 'Architectural',
-    logical: 'Logical',
-    integration: 'Integration', 
-    domain: 'Domain'
-  };
-  
-  const allLevels = 'LOW • MEDIUM • HIGH • VERY HIGH';
-  
-  Object.entries(categories).forEach(([category, level]) => {
-    const name = categoryNames[category] || capitalize(category);
-    const levelDisplay = allLevels.replace(level, `**${level}**`);
-    section += `| ${name} | ${levelDisplay} |\n`;
-  });
-  
-  section += `\n`;
-  return section;
+  if (hasHigh) {
+    return `**Complexity**: Some areas require expert review\n\n`;
+  } else if (hasMedium) {
+    return `**Complexity**: Standard review recommended\n\n`;
+  } else {
+    return `**Complexity**: Low - routine changes\n\n`;
+  }
 }
 
 function buildASTSection(results) {

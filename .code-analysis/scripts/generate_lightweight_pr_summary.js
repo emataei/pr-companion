@@ -8,7 +8,7 @@ const path = require('path');
 function generateLightweightPRSummary() {
   try {
     // Load the PR impact analysis data
-    const analysisPath = path.join('..', 'outputs', 'pr_impact_analysis_v2.json');
+    const analysisPath = path.join('.code-analysis', 'outputs', 'pr_impact_analysis_v2.json');
     let analysisData = {};
     
     if (fs.existsSync(analysisPath)) {
@@ -20,7 +20,7 @@ function generateLightweightPRSummary() {
     const summary = buildLightweightSummary(analysisData);
     
     // Write to output file
-    const outputPath = path.join('..', 'outputs', 'pr_impact_summary_lightweight.md');
+    const outputPath = path.join('.code-analysis', 'outputs', 'pr_impact_summary_lightweight.md');
     fs.writeFileSync(outputPath, summary, 'utf-8');
     
     console.log(`✅ Lightweight PR impact summary generated: ${outputPath}`);

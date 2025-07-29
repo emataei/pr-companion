@@ -4,27 +4,61 @@
 
 ## 🚀 Quick Setup (5 minutes)
 
-### 1. Copy Files
+### Step 1: Copy Files (30 seconds)
 ```bash
-# Copy these folders to your repository root:
+# Copy these 2 folders to your repository root:
 .code-analysis/
 .github/workflows/
 ```
 
-### 2. Add GitHub Secrets
-Go to your repo → Settings → Secrets and variables → Actions:
-```
-AI_FOUNDRY_ENDPOINT = your-azure-ai-endpoint
-AI_FOUNDRY_TOKEN = your-azure-ai-key  
-AI_FOUNDRY_MODEL = gpt-4o (optional, defaults to gpt-4o)
-```
+### Step 2: GitHub Secrets (2 minutes)
+1. Go to your repo → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret** and add:
 
-### 3. Test
-Create a PR → Watch automated comments appear with visual analysis
+| Name | Value | Required |
+|------|--------|----------|
+| `AI_FOUNDRY_ENDPOINT` | Your Azure AI endpoint URL | ✅ Yes |
+| `AI_FOUNDRY_TOKEN` | Your Azure AI API key | ✅ Yes |
+| `AI_FOUNDRY_MODEL` | `gpt-4o` (or your model) | ✅ Yes |
+
+### Step 3: Test (30 seconds)
+1. Create any PR in your repository
+2. Watch for automated comments with visual analysis
+3. Done! 🎉
+
+### 🆘 Troubleshooting
+
+**No comments appearing?**
+- Check Actions tab for workflow runs
+- Verify secrets are set correctly
+- Ensure PR has code changes (not just markdown)
+
+**AI analysis failing?**
+- Verify your Azure AI endpoint is active
+- Check API key permissions
+- Model name must match your deployment
+
+**Need help?**
+- Check workflow logs in Actions tab
+- All features work without AI (visuals only)
+- Create an issue if problems persist
 
 ---
 
-## 📊 Features & Value
+## � What You Get
+
+Every PR will automatically receive:
+- ⚡ **Quality score** (0-100) in ~30 seconds
+- 📊 **Visual impact analysis** with embedded images
+- 🏷️ **Smart labels** (feature/bugfix/refactor/etc.)
+- 📝 **Documentation suggestions** 
+- 🎯 **Risk assessment** with actionable insights
+
+**Zero maintenance required** - just create PRs and get instant analysis.
+
+---
+
+## �📊 Features & Value
 
 ### � **AI Cognitive Analysis**
 - **What:** Analyzes code complexity and change patterns

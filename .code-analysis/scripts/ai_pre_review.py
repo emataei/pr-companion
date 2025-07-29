@@ -226,12 +226,15 @@ class AIPreReviewBot:
         
         Please provide a structured analysis with:
         
-        1. **Plain-English Summary**: What does this change do in simple terms?
+        1. **Plain-English Summary**: What this change does in simple terms (format as bulleted list of key points):
+           • Point 1: Brief description
+           • Point 2: Brief description  
+           • Point 3: Brief description
         2. **Business Impact**: How does this affect users, features, or business logic?
         3. **Technical Changes**: What are the key implementation details?
         4. **Risk Assessment**: What potential issues or concerns should reviewers watch for?
         
-        Keep each section concise but informative. Focus on what's most important for a human reviewer to understand.
+        For the summary section, ALWAYS use bullet points (•) to make it easy to scan and understand quickly. Each bullet should be concise and focused on one key change or improvement.
         """
         
         try:

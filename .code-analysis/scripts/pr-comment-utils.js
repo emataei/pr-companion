@@ -171,12 +171,17 @@ function smartTruncate(text, maxLength = 300, suffix = '...') {
   }
   
   // Try to find good breaking points in order of preference:
-  // 1. End of paragraph (double newline)
-  // 2. End of sentence (period + space or period + newline)
-  // 3. End of sentence (just period)
-  // 4. Word boundary (space)
+  // 1. End of a bullet point list item
+  // 2. End of paragraph (double newline)
+  // 3. End of sentence (period + space or period + newline)
+  // 4. End of sentence (just period)
+  // 5. Word boundary (space)
   
   const breakPoints = [
+    // Look for end of bullet points (bullet + content + newline)
+    text.lastIndexOf('\n• ', maxLength),
+    text.lastIndexOf('\n- ', maxLength),
+    text.lastIndexOf('\n* ', maxLength),
     text.lastIndexOf('\n\n', maxLength),
     text.lastIndexOf('. ', maxLength),
     text.lastIndexOf('.\n', maxLength),
@@ -185,8 +190,18 @@ function smartTruncate(text, maxLength = 300, suffix = '...') {
   ];
   
   for (const breakPoint of breakPoints) {
-    if (breakPoint > maxLength * 0.7) { // Don't truncate too aggressively
-      const truncated = text.substring(0, breakPoint);
+    if (breakPoint > maxLength * 0.6) { // Allow more flexibility for bullet points
+      let truncated = text.substring(0, breakPoint);
+      
+      // If we broke at a bullet point, include the bullet point marker
+      if (breakPoint > 0 && /\n[•\-*] /.test(text.substring(breakPoint - 3, breakPoint + 3))) {
+        // Find the end of this bullet point
+        const nextNewline = text.indexOf('\n', breakPoint + 1);
+        if (nextNewline > 0 && nextNewline < maxLength + 100) { // Allow a bit of overflow for complete bullets
+          truncated = text.substring(0, nextNewline);
+        }
+      }
+      
       return truncated + (truncated.endsWith('.') ? suffix : '.' + suffix);
     }
   }

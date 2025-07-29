@@ -92,7 +92,7 @@ async function generateEnhancedImageReport() {
   console.log('Generating enhanced image report with PNG displays...');
   
   // Use the correct path to .code-analysis/outputs directory
-  const outputsDir = path.resolve('..', 'outputs');  // This resolves to .code-analysis/outputs from scripts directory
+  const outputsDir = path.resolve('.code-analysis', 'outputs');  // From repository root
   
   // Ensure outputs directory exists
   if (!fs.existsSync(outputsDir)) {
