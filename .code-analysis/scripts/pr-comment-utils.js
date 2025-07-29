@@ -10,11 +10,22 @@ const fs = require('fs');
  * @returns {number|null} PR number or null if not found
  */
 function getPRNumber(context) {
+  // First try to get from context (for pull_request events)
   const prNumber = context.issue?.number || 
                    context.payload?.pull_request?.number || 
                    context.payload?.number;
   
-  return prNumber;
+  if (prNumber) {
+    return prNumber;
+  }
+  
+  // For workflow_run events, try to get from environment variable
+  const envPrNumber = process.env.PR_NUMBER;
+  if (envPrNumber) {
+    return parseInt(envPrNumber, 10);
+  }
+  
+  return null;
 }
 
 /**

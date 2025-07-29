@@ -1,7 +1,5 @@
 name: PR Visuals and Documentation
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ["Code Quality Analysis", "AI Cognitive Analysis"]
     types: [completed]
@@ -12,7 +10,7 @@ permissions:
 jobs:
   generate-pr-visuals-and-docs:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     
     steps:
       - name: Checkout repository
@@ -196,14 +194,14 @@ jobs:
           # Setup GitHub Pages structure
           python .code-analysis/scripts/setup_github_pages.py
           # Create the gh-pages directory structure for this PR
-          mkdir -p gh-pages/pr/${{ github.event.pull_request.number }}
+          mkdir -p gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}
           
           # IMPORTANT: Remove old PR files first to force regeneration
           echo "Removing old PR files to ensure fresh content..."
-          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.png
-          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.gif
-          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.svg
-          rm -f gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
+          rm -f gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/*.png
+          rm -f gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/*.gif
+          rm -f gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/*.svg
+          rm -f gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/test.txt
           
           # Copy all generated PNG and GIF files to gh-pages with commit hash for cache busting
           if [ -d ".code-analysis/outputs" ]; then
@@ -222,9 +220,9 @@ jobs:
                 name="${filename%.*}"
                 extension="${filename##*.}"
                 new_filename="${name}-${SHORT_SHA}.${extension}"
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$new_filename"
                 # Also copy without hash for backward compatibility
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$filename"
                 echo "Copied $filename as $new_filename"
               done
             else
@@ -237,9 +235,9 @@ jobs:
                 name="${filename%.*}"
                 extension="${filename##*.}"
                 new_filename="${name}-${SHORT_SHA}.${extension}"
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$new_filename"
                 # Also copy without hash for backward compatibility
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$filename"
                 echo "Copied $filename as $new_filename"
               done
             else
@@ -252,20 +250,20 @@ jobs:
                 name="${filename%.*}"
                 extension="${filename##*.}"
                 new_filename="${name}-${SHORT_SHA}.${extension}"
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$new_filename"
                 # Also copy without hash for backward compatibility
-                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                cp "$file" "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/$filename"
                 echo "Copied $filename as $new_filename"
               done
             else
               echo "No SVG files found"
             fi
             # List what we're deploying
-            echo "Files being deployed to gh-pages/pr/${{ github.event.pull_request.number }}/:"
-            ls -la gh-pages/pr/${{ github.event.pull_request.number }}/
+            echo "Files being deployed to gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/:"
+            ls -la gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/
             # Show file sizes and types
             echo "File details:"
-            for file in gh-pages/pr/${{ github.event.pull_request.number }}/*; do
+            for file in gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/*; do
               if [ -f "$file" ]; then
                 echo "  $(basename "$file"): $(wc -c < "$file") bytes, type: $(file -b "$file")"
               fi
@@ -274,15 +272,15 @@ jobs:
             find gh-pages -type f -exec ls -la {} \;
             # Verify PNG files are actually PNG images
             echo "Verifying PNG files:"
-            for png_file in gh-pages/pr/${{ github.event.pull_request.number }}/*.png; do
+            for png_file in gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/*.png; do
               if [ -f "$png_file" ]; then
                 echo "  $(basename "$png_file"): $(file "$png_file")"
               fi
             done
             # Create a simple test file to verify deployment
             echo "Creating test file for deployment verification..."
-            echo "This is a test file created at $(date) - Update: ${{ github.run_number }}" > gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
-            echo "Test file created with content: $(cat gh-pages/pr/${{ github.event.pull_request.number }}/test.txt)"
+            echo "This is a test file created at $(date) - Update: ${{ github.run_number }}" > gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/test.txt
+            echo "Test file created with content: $(cat gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/test.txt)"
             # Final verification before deployment
             echo ""
             echo "=== FINAL DEPLOYMENT STRUCTURE ==="
@@ -290,18 +288,18 @@ jobs:
             find gh-pages -type f -name "*.html" -o -name "*.png" -o -name "*.txt" | head -20
             echo ""
             echo "PR directory contents:"
-            ls -la gh-pages/pr/${{ github.event.pull_request.number }}/ | head -10
+            ls -la gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/ | head -10
             echo ""
             echo "Total files being deployed: $(find gh-pages -type f | wc -l)"
           else
             echo "No outputs directory found"
           fi
           # Create an index.html for the PR
-          cat > gh-pages/pr/${{ github.event.pull_request.number }}/index.html << 'EOF'
+          cat > gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
-              <title>PR #${{ github.event.pull_request.number }} Visuals</title>
+              <title>PR #${{ steps.pr-info.outputs.pr_number }} Visuals</title>
               <style>
                   body { font-family: Arial, sans-serif; margin: 20px; }
                   .visual { margin: 20px 0; text-align: center; }
@@ -311,7 +309,7 @@ jobs:
               </style>
           </head>
           <body>
-              <h1>PR #${{ github.event.pull_request.number }} Visual Analysis</h1>
+              <h1>PR #${{ steps.pr-info.outputs.pr_number }} Visual Analysis</h1>
               <div class="visual">
                   <h2>PR Impact Grid</h2>
                   <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>   
@@ -335,9 +333,9 @@ jobs:
           echo "Repository: ${{ github.repository }}"
           echo "Repository owner: ${{ github.repository_owner }}"
           echo "Repository name: ${{ github.event.repository.name }}"
-          echo "PR number: ${{ github.event.pull_request.number }}"
+          echo "PR number: ${{ steps.pr-info.outputs.pr_number }}"
           echo "GitHub Pages URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          echo "PR visuals URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          echo "PR visuals URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ steps.pr-info.outputs.pr_number }}/"
           
           # Check if gh-pages directory was created properly
           echo "Contents of gh-pages directory:"
@@ -354,9 +352,9 @@ jobs:
           fi
           
           # Check if PR index.html exists
-          if [ -f "gh-pages/pr/${{ github.event.pull_request.number }}/index.html" ]; then
+          if [ -f "gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/index.html" ]; then
             echo "PR index.html exists"
-            echo "PR index.html size: $(wc -c < gh-pages/pr/${{ github.event.pull_request.number }}/index.html) bytes"
+            echo "PR index.html size: $(wc -c < gh-pages/pr/${{ steps.pr-info.outputs.pr_number }}/index.html) bytes"
           else
             echo "PR index.html missing"
           fi
@@ -367,7 +365,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./gh-pages
           keep_files: true
-          commit_message: "Deploy PR #${{ github.event.pull_request.number }} visuals"
+          commit_message: "Deploy PR #${{ steps.pr-info.outputs.pr_number }} visuals"
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
           enable_jekyll: false
@@ -378,7 +376,7 @@ jobs:
         run: |
           echo "GitHub Pages deployment completed"
           echo "Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          echo "PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ github.event.pull_request.number }}/"
+          echo "PR visuals: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/${{ steps.pr-info.outputs.pr_number }}/"
           echo ""
           echo "Note: GitHub Pages may take 5-10 minutes to update after deployment"
           echo "If links don't work immediately, please wait and try again"
@@ -387,7 +385,7 @@ jobs:
           echo ""
           echo "Testing file accessibility after deployment:"
           BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          PR_NUM="${{ github.event.pull_request.number }}"
+          PR_NUM="${{ steps.pr-info.outputs.pr_number }}"
           
           echo "Expected URLs:"
           echo "  Main site: ${BASE_URL}/"
@@ -425,7 +423,7 @@ jobs:
         run: |
           # Generate the GitHub Pages URLs for the images
           BASE_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"       
-          PR_NUM="${{ github.event.pull_request.number }}"
+          PR_NUM="${{ steps.pr-info.outputs.pr_number }}"
           echo "base_url=${BASE_URL}" >> $GITHUB_OUTPUT
           echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
           echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
