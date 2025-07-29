@@ -37,54 +37,54 @@ def save_image_with_base64(fig, base_filename):
     # Print output directory for debugging
     print(f"Saving image to: {output_dir.absolute()}")
     
-    # Save PNG file with size optimization
+    # Save PNG file with improved quality settings
     png_path = output_dir / f"{base_filename}.png"
     
-    # First save to check raw file size
-    temp_buffer = BytesIO()
-    fig.savefig(
-        temp_buffer,
-        format='png',
-        dpi=80,
-        bbox_inches='tight',
-        facecolor='white'
-    )
-    temp_buffer.seek(0)
-    raw_size = len(temp_buffer.getvalue())
-    temp_buffer.close()
-
-    dpi = 80
-    # If too large, reduce DPI and try again
-    max_raw_size = 45 * 1024  # 45KB raw for optimal loading
-    if raw_size > max_raw_size:
-        print(f"Image too large ({raw_size/1024:.1f}KB), reducing DPI from {dpi} to 60")
-        dpi = 60
-        
-        # Try again with lower DPI
+    # Start with higher DPI for better quality
+    dpi_options = [120, 100, 80]  # Try high quality first, then step down if needed
+    max_file_size = 100 * 1024    # Increased to 100KB for better quality
+    
+    final_dpi = dpi_options[0]
+    
+    for dpi in dpi_options:
+        # Test save to check file size
         temp_buffer = BytesIO()
         fig.savefig(
             temp_buffer,
             format='png',
             dpi=dpi,
             bbox_inches='tight',
-            facecolor='white'
+            facecolor='white',
+            edgecolor='none'  # Ensure clean edges
         )
         temp_buffer.seek(0)
-        raw_size = len(temp_buffer.getvalue())
+        file_size = len(temp_buffer.getvalue())
         temp_buffer.close()
         
-        # If still too large, reduce further
-        if raw_size > max_raw_size:
-            print(f"Still too large ({raw_size/1024:.1f}KB), reducing DPI to 40")
-            dpi = 40
+        print(f"Testing DPI {dpi}: {file_size/1024:.1f}KB")
+        
+        if file_size <= max_file_size:
+            final_dpi = dpi
+            break
+        elif dpi == dpi_options[-1]:
+            # If even the lowest DPI is too large, use it anyway for quality
+            print(f"Warning: Image exceeds {max_file_size/1024:.0f}KB limit, using DPI {dpi} anyway")
+            final_dpi = dpi
 
-    # Save PNG file with optimized DPI
-    fig.savefig(png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
+    # Save PNG file with selected DPI
+    fig.savefig(
+        png_path, 
+        dpi=final_dpi, 
+        bbox_inches='tight', 
+        facecolor='white',
+        edgecolor='none',
+        pad_inches=0.1  # Small padding for cleaner appearance
+    )
     
-    # Get file size
+    # Get final file size
     size_kb = png_path.stat().st_size / 1024
     
-    print(f"Generated optimized {base_filename}: {size_kb:.1f} KB (DPI: {dpi})")
+    print(f"Generated high-quality {base_filename}: {size_kb:.1f} KB (DPI: {final_dpi})")
     print(f"PNG file saved to: {png_path}")
     
     return png_path
