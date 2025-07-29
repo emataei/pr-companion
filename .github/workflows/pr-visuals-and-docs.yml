@@ -1,5 +1,7 @@
 name: PR Visuals and Documentation
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ["Code Quality Analysis", "AI Cognitive Analysis"]
     types: [completed]
@@ -10,14 +12,27 @@ permissions:
 jobs:
   generate-pr-visuals-and-docs:
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+          
+      - name: Get PR number
+        id: pr-info
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            # For workflow_run, get PR number from the triggering workflow
+            PR_NUMBER=$(gh pr list --head ${{ github.event.workflow_run.head_branch }} --json number --jq '.[0].number')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Download code quality analysis results
         uses: actions/download-artifact@v4
@@ -176,7 +191,6 @@ jobs:
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL || 'gpt-4o' }}
       - name: Prepare GitHub Pages deployment
-        if: github.event_name == 'pull_request'
         run: |
           echo "Preparing GitHub Pages deployment for PR visuals..."
           # Setup GitHub Pages structure
@@ -317,7 +331,6 @@ jobs:
           EOF
 
       - name: Debug GitHub Pages setup
-        if: github.event_name == 'pull_request'
         run: |
           echo "Repository: ${{ github.repository }}"
           echo "Repository owner: ${{ github.repository_owner }}"
@@ -349,7 +362,6 @@ jobs:
           fi
 
       - name: Deploy to GitHub Pages
-        if: github.event_name == 'pull_request'
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -363,7 +375,6 @@ jobs:
           destination_dir: '.'  # Deploy to root of gh-pages branch
 
       - name: Verify deployment
-        if: github.event_name == 'pull_request'
         run: |
           echo "GitHub Pages deployment completed"
           echo "Main site: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
@@ -403,7 +414,6 @@ jobs:
           echo "   - All files should be in the root and pr/ subdirectories"
 
       - name: Cleanup old GitHub Pages content (optional)
-        if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
           echo "Cleanup step - this may fail on first run and that's OK"
@@ -411,7 +421,6 @@ jobs:
           echo "GitHub Pages deployment successful"
 
       - name: Create PR visual URLs
-        if: github.event_name == 'pull_request'
         id: visual-urls
         run: |
           # Generate the GitHub Pages URLs for the images
@@ -459,7 +468,7 @@ jobs:
             .code-analysis/outputs/*.gif
           retention-days: 30
       - name: Cleanup old visual comments
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -467,13 +476,12 @@ jobs:
             const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
             return await script({ github, context });
       - name: Wait for GitHub Pages deployment
-        if: github.event_name == 'pull_request'
         run: |
           echo "Waiting 30 seconds for GitHub Pages to propagate..."
           sleep 30
 
       - name: Comment PR with GitHub Pages hosted visuals
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -481,7 +489,7 @@ jobs:
             const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
             return await script({ github, context });
       - name: Comment PR with documentation suggestions
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
