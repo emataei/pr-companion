@@ -25,6 +25,13 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Clean output directory
+        run: |
+          echo "Cleaning .code-analysis/outputs directory..."
+          rm -rf .code-analysis/outputs
+          mkdir -p .code-analysis/outputs
+          echo "Output directory cleaned and recreated"
+      
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -194,13 +201,6 @@ jobs:
           pip install -r .github/requirements.txt
           # Install Azure AI dependencies for cognitive analysis
           pip install azure-ai-inference azure-identity
-
-      - name: Create output directories
-        run: |
-          # Remove and recreate output directory to ensure it's completely clean
-          rm -rf .code-analysis/outputs
-          mkdir -p .code-analysis/outputs
-          echo "Created clean output directories for AI analysis"
 
       - name: Get changed files
         id: changed-files
@@ -383,12 +383,12 @@ jobs:
         with:
           name: ai-cognitive-analysis-results
           path: |
-            ai-pre-review-results.json
+            .code-analysis/outputs/ai-pre-review-results.json
             .code-analysis/outputs/cognitive_analysis.json
             .code-analysis/outputs/cognitive-analysis-results.json
-            intent-classification-results.json
-            impact-prediction-results.json
-            semantic-commit-analysis.json
+            .code-analysis/outputs/intent-classification-results.json
+            .code-analysis/outputs/impact-prediction-results.json
+            .code-analysis/outputs/semantic-commit-analysis.json
         if: always()
 
   # Job 3: PR Visuals and Documentation (Depends on both previous jobs)
@@ -412,14 +412,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Create output directories
-        run: |
-          # Remove and recreate output directories to ensure they're completely clean
-          rm -rf .code-analysis/outputs
-          mkdir -p .code-analysis/outputs
-          mkdir -p .github/scripts
-          echo "Created clean output directories"
-          
       - name: Download code quality analysis results
         uses: actions/download-artifact@v4
         with:

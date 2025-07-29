@@ -417,8 +417,11 @@ def main():
     bot = AIPreReviewBot()
     results = bot.run_analysis()
     
+    # Ensure outputs directory exists  
+    os.makedirs('.code-analysis/outputs', exist_ok=True)
+    
     # Save results for the GitHub Action
-    with open('ai-pre-review-results.json', 'w') as f:
+    with open('.code-analysis/outputs/ai-pre-review-results.json', 'w') as f:
         json.dump(results, f, indent=2)
     
     print(f"AI Pre-Review analysis complete. Risk: {results['risk_level']}")

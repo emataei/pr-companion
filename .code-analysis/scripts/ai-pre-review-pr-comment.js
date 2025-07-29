@@ -8,7 +8,7 @@ module.exports = async ({ github, context }) => {
     return;
   }
 
-  const results = loadResults('ai-pre-review-results.json', { 
+  const results = loadResults('.code-analysis/outputs/ai-pre-review-results.json', { 
     summary: 'AI pre-review analysis failed',
     risk_level: 'UNKNOWN',
     risk_factors: [],
@@ -46,10 +46,10 @@ function buildComment(results) {
   const riskLevel = getRiskLevel(results.risk_level);
   
   // Load quality gate results
-  const qualityResults = loadResults('quality-gate-results.json', null);
+  const qualityResults = loadResults('.code-analysis/outputs/quality-gate-results.json', null);
   
   // Load intent classification results
-  const intentResults = loadResults('intent-classification-results.json', null);
+  const intentResults = loadResults('.code-analysis/outputs/intent-classification-results.json', null);
   
   let comment = `## AI Pre-Review Analysis\n\n`;
   

@@ -8,7 +8,7 @@ module.exports = async ({ github, context }) => {
     return;
   }
 
-  const results = loadResults('cognitive-analysis-results.json', { 
+  const results = loadResults('.code-analysis/outputs/cognitive-analysis-results.json', { 
     tier: 0, 
     total_score: null, // Use null instead of 0 to indicate no score available
     reasoning: 'Analysis in progress or failed to load results',

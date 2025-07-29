@@ -484,7 +484,9 @@ def main():
     
     # Always generate PR integration file if in GitHub Actions
     if args.pr_output or os.getenv('GITHUB_ACTIONS'):
-        pr_output_file = 'intent-classification-results.json'
+        # Ensure outputs directory exists
+        os.makedirs('.code-analysis/outputs', exist_ok=True)
+        pr_output_file = '.code-analysis/outputs/intent-classification-results.json'
         with open(pr_output_file, 'w') as f:
             json.dump(result, f, indent=2)
         print(f"PR integration results written to {pr_output_file}")
