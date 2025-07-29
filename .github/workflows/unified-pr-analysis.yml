@@ -176,7 +176,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: code-quality-analysis-results
-          path: ./quality-results/
+          path: ./
         continue-on-error: true
 
       - name: Setup Python
@@ -190,6 +190,13 @@ jobs:
           pip install -r .github/requirements.txt
           # Install Azure AI dependencies for cognitive analysis
           pip install azure-ai-inference azure-identity
+
+      - name: Create output directories
+        run: |
+          # Remove and recreate output directory to ensure it's completely clean
+          rm -rf .code-analysis/outputs
+          mkdir -p .code-analysis/outputs
+          echo "Created clean output directories for AI analysis"
 
       - name: Get changed files
         id: changed-files
@@ -337,11 +344,11 @@ jobs:
             semantic_commit_analysis.json
         if: always()
 
-  # Job 3: PR Visuals and Documentation (Depends on code-quality-analysis)
+  # Job 3: PR Visuals and Documentation (Depends on both previous jobs)
   pr-visuals-and-docs:
     name: PR Visuals and Documentation
     runs-on: ubuntu-latest
-    needs: code-quality-analysis
+    needs: [code-quality-analysis, ai-cognitive-analysis]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -359,7 +366,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ai-cognitive-analysis-results
-          path: ./
+          path: ./.code-analysis/outputs/
         continue-on-error: true
 
       - name: Set up Node.js
@@ -374,23 +381,28 @@ jobs:
 
       - name: Create output directories
         run: |
+          # Remove and recreate output directories to ensure they're completely clean
+          rm -rf .code-analysis/outputs
           mkdir -p .code-analysis/outputs
           mkdir -p .github/scripts
-          # Clear old outputs to ensure fresh generation
-          rm -f .code-analysis/outputs/*.png
-          rm -f .code-analysis/outputs/*.gif
-          rm -f .code-analysis/outputs/*.svg
           echo "Created clean output directories"
           
       - name: Verify analysis artifacts
         run: |
           echo "Checking for downloaded analysis results..."
+          # Copy quality gate results to the expected location if it exists in root
+          if [ -f "quality-gate-results.json" ]; then
+            echo "Found quality gate results in root, copying to outputs directory..."
+            cp quality-gate-results.json .code-analysis/outputs/
+          fi
           echo "Code quality results:"
           ls -la .code-analysis/outputs/ | grep -E "(quality|gate)" || echo "No quality gate results found"
           echo "AI cognitive results:"
-          ls -la . | grep -E "(cognitive|ai_pre)" || echo "No cognitive analysis results found"
+          ls -la .code-analysis/outputs/ | grep -E "(cognitive|ai_pre)" || echo "No cognitive analysis results found"
           echo "Current working directory contents:"
           find .code-analysis/outputs -name "*.json" -exec echo "Found: {}" \;
+          echo "Root directory JSON files:"
+          ls -la *.json || echo "No JSON files in root"
 
       - name: Install dependencies
         run: |
