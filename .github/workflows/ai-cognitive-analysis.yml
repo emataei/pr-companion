@@ -1,7 +1,6 @@
 name: AI Cognitive Analysis
 
 on:
-
   workflow_run:
     workflows: ["Code Quality Analysis"]
     types: [completed]
@@ -13,25 +12,29 @@ permissions:
 jobs:
   ai-cognitive-analysis:
     runs-on: ubuntu-latest
-    if: (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event.workflow_run.conclusion == 'success'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Get PR number
         id: pr-info
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          else
-            # For workflow_run, get PR number from the triggering workflow
-            PR_NUMBER=$(gh pr list --head ${{ github.event.workflow_run.head_branch }} --json number --jq '.[0].number')
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          fi
+          # For workflow_run, get PR info from the triggering workflow
+          PR_NUMBER=$(gh pr list --head ${{ github.event.workflow_run.head_branch }} --json number --jq '.[0].number')
+          PR_TITLE=$(gh pr view $PR_NUMBER --json title --jq '.title')
+          PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_title<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_TITLE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "pr_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -94,7 +97,7 @@ jobs:
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           python .code-analysis/scripts/run_cognitive_analysis.py
           echo "Cognitive complexity analysis complete"
@@ -107,7 +110,7 @@ jobs:
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           python .code-analysis/scripts/ai_pre_review.py
           echo "AI-generated analysis for review triage (uses cognitive results)"
@@ -119,12 +122,12 @@ jobs:
           AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           python .code-analysis/scripts/intent_classifier.py \
             --repo . \
-            --title "${{ github.event.pull_request.title }}" \
-            --description "${{ github.event.pull_request.body }}" \
+            --title "${{ steps.pr-info.outputs.pr_title }}" \
+            --description "${{ steps.pr-info.outputs.pr_body }}" \
             --pr-output
           echo "AI-generated intent classification analysis"
         continue-on-error: true
@@ -135,12 +138,12 @@ jobs:
           AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           python .code-analysis/scripts/impact_predictor.py \
             --repo . \
-            --pr-title "${{ github.event.pull_request.title }}" \
-            --pr-description "${{ github.event.pull_request.body }}" \
+            --pr-title "${{ steps.pr-info.outputs.pr_title }}" \
+            --pr-description "${{ steps.pr-info.outputs.pr_body }}" \
             --pr-output
           echo "AI-generated impact prediction analysis"
         continue-on-error: true
@@ -151,7 +154,7 @@ jobs:
           AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
           AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         run: |
           python .code-analysis/scripts/semantic_commit_analyzer.py
           echo "AI-generated semantic commit story"
@@ -159,16 +162,20 @@ jobs:
 
       # POST AI ANALYSIS COMMENTS IN PRIORITY ORDER
       - name: Post AI Pre-Review Comment (1st - Priority)
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         with:
           script: |
             const script = require('./.code-analysis/scripts/ai-pre-review-pr-comment.js');
             return await script({ github, context });
 
       - name: Post Cognitive Complexity Comment (2nd)
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         with:
           script: |
             const script = require('./.code-analysis/scripts/cognitive-analysis-pr-comment.js');
@@ -176,7 +183,7 @@ jobs:
 
       # Intent classification now integrated into AI pre-review comment
       # - name: Post Intent Classification Comment (3rd)
-      #   if: always() && github.event_name == 'pull_request'
+      #   if: always()
       #   uses: actions/github-script@v7
       #   with:
       #     script: |
@@ -184,8 +191,10 @@ jobs:
       #       return await script({ github, context });
 
       - name: Update PR Description with Semantic Story
-        if: always() && github.event_name == 'pull_request'
+        if: always()
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
         with:
           script: |
             const script = require('./.code-analysis/scripts/semantic-commit-pr-description.js');
