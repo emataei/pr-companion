@@ -721,22 +721,22 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     
     # LEFT COLUMN: Risk Categories with improved spacing
     # HIGH RISK section with better layout
-    ax_files.text(0.05, 0.8, f"HIGH RISK ({high_risk_count} files)", ha='left', va='top', 
+    ax_files.text(0.05, 0.85, f"HIGH RISK ({high_risk_count} files)", ha='left', va='top', 
                  fontsize=13, fontweight='bold', color='#E74C3C')
     if high_risk_files:
         first_high_risk = high_risk_files[0]
         file_name = first_high_risk.get('file', 'Security/Critical files')
         reason = first_high_risk.get('reason', 'High risk changes')
         # Split into two lines for better readability
-        ax_files.text(0.07, 0.75, f"• {file_name}", ha='left', va='top', 
+        ax_files.text(0.07, 0.79, f"• {file_name}", ha='left', va='top', 
                      fontsize=10, color='#2C3E50', fontweight='bold')
-        ax_files.text(0.07, 0.72, f"  {reason}", ha='left', va='top', 
+        ax_files.text(0.07, 0.75, f"  {reason}", ha='left', va='top', 
                      fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.07, 0.75, "• No high risk files detected", ha='left', va='top', 
+        ax_files.text(0.07, 0.79, "• No high risk files detected", ha='left', va='top', 
                      fontsize=10, color='#7F8C8D')
     
-    # MEDIUM RISK section with better layout
+    # MEDIUM RISK section with better layout (more spacing)
     ax_files.text(0.05, 0.65, f"MEDIUM RISK ({medium_risk_count} files)", ha='left', va='top', 
                  fontsize=13, fontweight='bold', color='#F39C12')
     if medium_risk_files:
@@ -744,28 +744,28 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
         file_name = first_medium_risk.get('file', 'Complex files')
         reason = first_medium_risk.get('reason', 'Needs review')
         # Split into two lines for better readability
-        ax_files.text(0.07, 0.6, f"• {file_name}", ha='left', va='top', 
+        ax_files.text(0.07, 0.59, f"• {file_name}", ha='left', va='top', 
                      fontsize=10, color='#2C3E50', fontweight='bold')
-        ax_files.text(0.07, 0.57, f"  {reason}", ha='left', va='top', 
+        ax_files.text(0.07, 0.55, f"  {reason}", ha='left', va='top', 
                      fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.07, 0.6, "• No medium risk files detected", ha='left', va='top', 
+        ax_files.text(0.07, 0.59, "• No medium risk files detected", ha='left', va='top', 
                      fontsize=10, color='#7F8C8D')
     
-    # LOW RISK section with better layout
-    ax_files.text(0.05, 0.5, f"LOW RISK ({low_risk_count} files)", ha='left', va='top', 
+    # LOW RISK section with better layout (more spacing)
+    ax_files.text(0.05, 0.45, f"LOW RISK ({low_risk_count} files)", ha='left', va='top', 
                  fontsize=13, fontweight='bold', color='#27AE60')
     if low_risk_files:
         first_low_risk = low_risk_files[0]
         file_name = first_low_risk.get('file', 'Documentation files')
         reason = first_low_risk.get('reason', 'Minor changes')
         # Split into two lines for better readability
-        ax_files.text(0.07, 0.45, f"• {file_name}", ha='left', va='top', 
+        ax_files.text(0.07, 0.39, f"• {file_name}", ha='left', va='top', 
                      fontsize=10, color='#2C3E50', fontweight='bold')
-        ax_files.text(0.07, 0.42, f"  {reason}", ha='left', va='top', 
+        ax_files.text(0.07, 0.35, f"  {reason}", ha='left', va='top', 
                      fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.07, 0.45, "• No low risk files detected", ha='left', va='top', 
+        ax_files.text(0.07, 0.39, "• No low risk files detected", ha='left', va='top', 
                      fontsize=10, color='#7F8C8D')
     
     # RIGHT COLUMN: Change Distribution with improved positioning

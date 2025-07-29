@@ -11,7 +11,15 @@
 .github/workflows/
 ```
 
-### Step 2: GitHub Secrets (2 minutes)
+### Step 2: Enable GitHub Pages (1 minute)
+1. Go to your repo → **Settings** → **Pages**
+2. Under **Source**, select **Deploy from a branch**
+3. Under **Branch**, select `gh-pages` and `/ (root)`
+4. Click **Save**
+
+> **Why needed?** Visual analysis images are hosted on GitHub Pages for embedding in PR comments.
+
+### Step 3: GitHub Secrets (2 minutes)
 1. Go to your repo → **Settings** → **Secrets and variables** → **Actions**
 2. Click **New repository secret** and add:
 
@@ -21,7 +29,7 @@
 | `AI_FOUNDRY_TOKEN` | Your Azure AI API key | ✅ Yes |
 | `AI_FOUNDRY_MODEL` | `gpt-4o` (or your model) | ✅ Yes |
 
-### Step 3: Test (30 seconds)
+### Step 4: Test (30 seconds)
 1. Create any PR in your repository
 2. Watch for automated comments with visual analysis
 3. Done! 🎉
@@ -32,6 +40,12 @@
 - Check Actions tab for workflow runs
 - Verify secrets are set correctly
 - Ensure PR has code changes (not just markdown)
+
+**Visual analysis images not showing?**
+- Verify GitHub Pages is enabled (Settings → Pages → Deploy from branch → gh-pages)
+- Check if gh-pages branch exists and has content
+- Check if Pages deployment succeeded in Actions tab
+- Images appear after ~15-30 seconds delay
 
 **AI analysis failing?**
 - Verify your Azure AI endpoint is active
