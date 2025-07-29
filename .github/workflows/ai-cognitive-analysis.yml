@@ -18,6 +18,21 @@ jobs:
     if: github.event_name == 'pull_request'
     
     steps:
+      - name: Wait for code quality analysis
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        id: wait-for-quality
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: technical-analysis
+          ref: ${{ github.event.pull_request.head.sha }}
+          timeoutSeconds: 600 # 10 minutes max wait
+          
+      - name: Download quality analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: ./quality-results/
+        continue-on-error: true
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
