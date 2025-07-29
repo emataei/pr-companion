@@ -1,11 +1,10 @@
 name: PR Visuals and Documentation
 on:
-  push:
-    branches:
-      - master
-      - main
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["Code Quality Analysis", "AI Cognitive Analysis"]
+    types: [completed]
 permissions:
   contents: write  # Needed for GitHub Pages deployment
   pull-requests: write
@@ -13,8 +12,8 @@ permissions:
 jobs:
   generate-pr-visuals-and-docs:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: [technical-analysis, ai-cognitive-analysis]  # Wait for both code quality and AI analysis
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

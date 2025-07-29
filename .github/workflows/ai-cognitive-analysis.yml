@@ -1,12 +1,11 @@
 name: AI Cognitive Analysis
 
 on:
-  push:
-    branches:
-      - master
-      - main
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["Code Quality Analysis"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -15,8 +14,7 @@ permissions:
 jobs:
   ai-cognitive-analysis:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    needs: technical-analysis  # Wait for code quality analysis to complete
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     
     steps:
       - name: Checkout repository
