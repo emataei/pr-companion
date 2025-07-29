@@ -541,10 +541,10 @@ def create_demo_visual():
         'total_lines_changed': 342
     }
     
-    return generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact)
+    return generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact, None)
 
 
-def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact):
+def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact, enhanced_data=None):
     """Generate the actual visual with provided data following redesign specifications"""
     # Create clean, simple layout with proper spacing
     fig = plt.figure(figsize=(12, 8))  # Smaller, more manageable size
@@ -597,35 +597,73 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_files.text(0.5, 0.9, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
                  fontsize=16, fontweight='bold', color='#2C3E50')
     
-    # Simple file categories without complex styling
-    ax_files.text(0.1, 0.7, "HIGH RISK (1 files)", ha='left', va='center', 
+    # Get risk categories from file_impact data
+    risk_categories = file_impact.get('risk_categories', {})
+    high_risk_count = risk_categories.get('high_risk', {}).get('count', 0)
+    medium_risk_count = risk_categories.get('medium_risk', {}).get('count', 0)
+    low_risk_count = risk_categories.get('low_risk', {}).get('count', 0)
+    
+    # Get actual file examples if available
+    high_risk_files = risk_categories.get('high_risk', {}).get('files', [])
+    medium_risk_files = risk_categories.get('medium_risk', {}).get('files', [])
+    low_risk_files = risk_categories.get('low_risk', {}).get('files', [])
+    
+    # HIGH RISK section with dynamic data
+    ax_files.text(0.1, 0.7, f"HIGH RISK ({high_risk_count} files)", ha='left', va='center', 
                  fontsize=12, fontweight='bold', color='#E74C3C')
-    ax_files.text(0.15, 0.6, "- /api/auth/* - Security vulnerability", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    if high_risk_files:
+        first_high_risk = high_risk_files[0]
+        display_text = f"- {first_high_risk.get('file', 'Security/Critical files')} - {first_high_risk.get('reason', 'High risk changes')}"
+        ax_files.text(0.15, 0.6, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
+    else:
+        ax_files.text(0.15, 0.6, "- No high risk files detected", ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
     
-    ax_files.text(0.1, 0.45, "MEDIUM RISK (2 files)", ha='left', va='center', 
+    # MEDIUM RISK section with dynamic data
+    ax_files.text(0.1, 0.45, f"MEDIUM RISK ({medium_risk_count} files)", ha='left', va='center', 
                  fontsize=12, fontweight='bold', color='#F39C12')
-    ax_files.text(0.15, 0.35, "- Complex refactoring needs review", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    if medium_risk_files:
+        first_medium_risk = medium_risk_files[0]
+        display_text = f"- {first_medium_risk.get('file', 'Complex files')} - {first_medium_risk.get('reason', 'Needs review')}"
+        ax_files.text(0.15, 0.35, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
+    else:
+        ax_files.text(0.15, 0.35, "- No medium risk files detected", ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
     
-    ax_files.text(0.1, 0.2, "LOW RISK (5 files)", ha='left', va='center', 
+    # LOW RISK section with dynamic data
+    ax_files.text(0.1, 0.2, f"LOW RISK ({low_risk_count} files)", ha='left', va='center', 
                  fontsize=12, fontweight='bold', color='#27AE60')
-    ax_files.text(0.15, 0.1, "- Documentation and formatting", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    if low_risk_files:
+        first_low_risk = low_risk_files[0]
+        display_text = f"- {first_low_risk.get('file', 'Documentation files')} - {first_low_risk.get('reason', 'Minor changes')}"
+        ax_files.text(0.15, 0.1, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
+    else:
+        ax_files.text(0.15, 0.1, "- No low risk files detected", ha='left', va='center', 
+                     fontsize=11, color='#2C3E50')
     
-    # Simple change distribution bars
+    # Dynamic change distribution bars
     ax_files.text(0.6, 0.7, "Change Distribution:", ha='left', va='center', 
                  fontsize=12, fontweight='bold', color='#2C3E50')
     
-    # Modified files bar (80%)
-    mod_rect = patches.Rectangle((0.6, 0.55), 0.25, 0.08, facecolor='#3498DB', alpha=0.8)
-    ax_files.add_patch(mod_rect)
-    ax_files.text(0.87, 0.59, "80% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
+    # Get change distribution data
+    change_dist = file_impact.get('change_distribution', {})
+    modified_pct = change_dist.get('modified_percentage', 80)
+    new_files_pct = change_dist.get('new_files_percentage', 20)
     
-    # New files bar (20%)
-    new_rect = patches.Rectangle((0.6, 0.4), 0.06, 0.08, facecolor='#27AE60', alpha=0.8)
+    # Modified files bar (dynamic percentage)
+    mod_width = max(0.05, (modified_pct / 100) * 0.25)  # Scale to max 0.25 width
+    mod_rect = patches.Rectangle((0.6, 0.55), mod_width, 0.08, facecolor='#3498DB', alpha=0.8)
+    ax_files.add_patch(mod_rect)
+    ax_files.text(0.87, 0.59, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
+    
+    # New files bar (dynamic percentage)  
+    new_width = max(0.02, (new_files_pct / 100) * 0.25)  # Scale to max 0.25 width
+    new_rect = patches.Rectangle((0.6, 0.4), new_width, 0.08, facecolor='#27AE60', alpha=0.8)
     ax_files.add_patch(new_rect)
-    ax_files.text(0.87, 0.44, "20% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.87, 0.44, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
     
     ax_files.set_xlim(0, 1)
     ax_files.set_ylim(0, 1)
@@ -637,16 +675,31 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_actions.text(0.1, 0.8, "Required Actions (Prioritized)", ha='left', va='center', 
                    fontsize=14, fontweight='bold', color='#2C3E50')
     
-    actions = [
-        "1. Fix security issue in auth.js:L45",
-        "2. Add tests for payment module", 
-        "3. Update API documentation"
-    ]
+    # Get actionable items from enhanced data
+    actions = []
+    action_colors = ['#E74C3C', '#F39C12', '#3498DB', '#9B59B6']
     
-    action_colors = ['#E74C3C', '#F39C12', '#3498DB']
+    if enhanced_data and 'actionable_items' in enhanced_data:
+        actionable_items = enhanced_data['actionable_items']
+        for i, item in enumerate(actionable_items[:3]):  # Limit to top 3 for visual space
+            icon = item.get('icon', '•')
+            title = item.get('title', 'Review required')
+            effort = item.get('effort', '?')
+            blocking = item.get('blocking', False)
+            blocking_text = " ⚠️" if blocking else ""
+            action_text = f"{i+1}. {icon} {title} ({effort}){blocking_text}"
+            actions.append(action_text)
+    else:
+        # Fallback actions if no enhanced data available
+        actions = [
+            "1. 🔍 Review changed files for quality",
+            "2. 🧪 Ensure test coverage is adequate", 
+            "3. 📝 Update documentation if needed"
+        ]
     
-    for i, (action, color) in enumerate(zip(actions, action_colors)):
+    for i, action in enumerate(actions):
         y_pos = 0.6 - (i * 0.2)
+        color = action_colors[i] if i < len(action_colors) else '#2C3E50'
         ax_actions.text(0.1, y_pos, action, ha='left', va='center', 
                        fontsize=12, color=color, fontweight='bold')
     
@@ -712,7 +765,7 @@ def generate_impact_grid():
     
     return generate_visual_with_data(visual_risk_score, visual_risk_level, visual_risk_color, 
                                    visual_review_time, visual_time_color, visual_heatmap_data, 
-                                   visual_file_impact)
+                                   visual_file_impact, enhanced_data)
 
 
 def create_no_data_visual():
