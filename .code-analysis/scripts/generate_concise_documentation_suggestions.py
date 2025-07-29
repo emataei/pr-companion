@@ -180,37 +180,28 @@ class AIDocumentationAnalyzer:
         file_list = ', '.join(changed_files[:15]) + ("..." if len(changed_files) > 15 else "")
         
         prompt = f"""
-        You are a technical documentation specialist. Analyze these code changes and provide precise, actionable documentation recommendations.
+        Analyze code changes and provide CONCISE documentation recommendations.
         
-        **Files changed ({len(changed_files)}):** {file_list}
+        **Files changed:** {file_list}
         
         **Code changes:**
         ```diff
         {truncated_diff}
         ```
         
-        **Task:** Generate specific documentation update recommendations based on the actual changes shown. Format your response as:
+        **Output format (be brief):**
         
-        ## Documentation Update Suggestions
+        ## Documentation Suggestions
         
-        **[NUMBER] documentation updates recommended**
+        1. `docs/FILE.md` - Reason (one line)
+        2. `docs/FILE.md` - Reason (one line)
         
-        For each recommendation, provide:
-        • **File to update:** `docs/[specific-file].md`
-        • **Why needed:** Brief explanation of what changed that requires documentation
-        • **Specific content:** What should be documented (APIs, configs, breaking changes, etc.)
-        • **Priority:** High/Medium/Low based on user impact
-        
-        **Analysis Guidelines:**
-        • Focus on user-facing changes (new APIs, configuration options, breaking changes)
-        • Ignore internal implementation details unless they affect usage
-        • Be specific about what needs documenting, not just "update docs"
-        • Consider different user types (developers, administrators, end-users)
-        • Suggest new documentation files if needed for significant features
-        
-        **If no documentation needed:** Explain why (internal changes, test-only, etc.)
-        
-        Keep recommendations precise and actionable - each should tell someone exactly what to document and why.
+        **Rules:**
+        - Only suggest if changes affect user-facing features
+        - One line per suggestion maximum
+        - Skip internal/test-only changes
+        - Maximum 5 suggestions
+        - Be specific about the file and reason
         """
         
         try:
@@ -222,17 +213,14 @@ class AIDocumentationAnalyzer:
             response = self.ai_client.complete(
                 messages=messages,
                 model=self.model_name,
-                temperature=0.2,  # Lower temperature for more consistent analysis
-                max_tokens=1500   # Allow for detailed recommendations
+                temperature=0.1,  # Lower temperature for consistent, concise output
+                max_tokens=500    # Reduced tokens for concise responses
             )
             
             ai_content = response.choices[0].message.content
             
-            # Add metadata footer
-            file_count = len(changed_files)
-            code_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs'])]
-            
-            ai_content += f"\n\n---\n*AI-analyzed {file_count} files ({len(code_files)} code files) for documentation impact*\n"
+            # Simple footer
+            ai_content += f"\n\n*AI-analyzed {len(changed_files)} files*\n"
             
             return ai_content
             
@@ -240,32 +228,18 @@ class AIDocumentationAnalyzer:
             print(f"AI analysis failed: {str(e)}")
             return None
     
-    def generate_rule_based_suggestions(self, changed_files, diff_content):
+    def generate_rule_based_suggestions(self, diff_content):
         """Fallback rule-based analysis"""
         suggestions = analyze_diff_content(diff_content)
         
-        content = "## Documentation Update Suggestions\n\n"
+        content = "## Documentation Suggestions\n\n"
         
         if not suggestions:
-            code_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs', '.cpp', '.c'])]
-            if code_files:
-                content += "**No documentation updates needed** - Changes appear to be internal implementation details.\n\n"
-            else:
-                content += "**No documentation updates needed** - Only non-code files modified.\n\n"
+            content += "*No documentation updates needed* - Changes appear to be internal implementation details.\n\n"
         else:
-            content += f"**{len(suggestions)} documentation updates recommended**\n\n"
-            for suggestion in suggestions:
-                content += f"• {suggestion}\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                content += f"{i}. {suggestion}\n"
             content += "\n"
-        
-        # Contextual summary
-        file_count = len(changed_files)
-        code_files = [f for f in changed_files if any(f.endswith(ext) for ext in ['.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.go', '.rs'])]
-        
-        if code_files:
-            content += f"**{file_count} files changed** ({len(code_files)} code files) - Analyzed diff content for documentation impact.\n\n"
-        else:
-            content += f"**{file_count} files changed** (config/docs only) - No API documentation impact expected.\n\n"
         
         return content
     
@@ -288,7 +262,7 @@ class AIDocumentationAnalyzer:
         else:
             print("Using rule-based analysis (AI not available)")
         
-        return self.generate_rule_based_suggestions(changed_files, diff_content)
+        return self.generate_rule_based_suggestions(diff_content)
 
 def main():
     """Main function"""
