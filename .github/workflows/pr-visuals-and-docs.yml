@@ -95,6 +95,10 @@ jobs:
           PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
           SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
           PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
+      - name: Generate enhanced PR impact analysis
+        run: |
+          echo "Generating enhanced PR impact analysis data..."
+          python .code-analysis/scripts/generate_enhanced_pr_impact.py
       - name: Generate development flow
         run: |
           echo "Checking if development flow script exists..."
