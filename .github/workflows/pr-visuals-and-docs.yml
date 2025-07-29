@@ -14,11 +14,26 @@ jobs:
   generate-pr-visuals-and-docs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    needs: [technical-analysis, ai-cognitive-analysis]  # Wait for both code quality and AI analysis
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          
+      - name: Download code quality analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: ./.code-analysis/outputs/
+        continue-on-error: true
+        
+      - name: Download AI cognitive analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-cognitive-analysis-results
+          path: ./
+        continue-on-error: true
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,6 +51,16 @@ jobs:
           rm -f .code-analysis/outputs/*.gif
           rm -f .code-analysis/outputs/*.svg
           echo "Created clean output directories"
+          
+      - name: Verify analysis artifacts
+        run: |
+          echo "Checking for downloaded analysis results..."
+          echo "Code quality results:"
+          ls -la .code-analysis/outputs/ | grep -E "(quality|gate)" || echo "No quality gate results found"
+          echo "AI cognitive results:"
+          ls -la . | grep -E "(cognitive|ai_pre)" || echo "No cognitive analysis results found"
+          echo "Current working directory contents:"
+          find .code-analysis/outputs -name "*.json" -exec echo "Found: {}" \;
 
       - name: Install dependencies
         run: |

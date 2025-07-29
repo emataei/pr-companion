@@ -12,6 +12,8 @@ from typing import Dict, List, Tuple, Any, Optional
 
 def analyze_pr_risk_context() -> Dict[str, Any]:
     """Analyze PR to provide contextual risk scoring"""
+    print("Starting PR risk context analysis...")
+    
     risk_data = {
         "overall_score": 0,
         "factors": {
@@ -26,21 +28,27 @@ def analyze_pr_risk_context() -> Dict[str, Any]:
     try:
         # Load quality gate results for security and complexity
         quality_file = Path('.code-analysis/outputs/quality-gate-results.json')
+        print(f"Looking for quality gate results at: {quality_file.absolute()}")
         if quality_file.exists():
+            print("Quality gate results found - loading...")
             with open(quality_file, 'r', encoding='utf-8') as f:
                 quality_data = json.load(f)
+                print(f"Quality data loaded: {len(quality_data)} keys")
                 
                 # Analyze security issues
                 security_issues = []
                 complexity_issues = []
                 
                 blocking_issues = quality_data.get('issues', {}).get('blocking', [])
+                print(f"Found {len(blocking_issues)} blocking issues")
                 for issue in blocking_issues:
                     category = issue.get('category', '').lower()
                     if 'security' in category or 'auth' in category or 'vulnerability' in category:
                         security_issues.append(issue)
                     elif 'complexity' in category or 'cognitive' in category:
                         complexity_issues.append(issue)
+                
+                print(f"Security issues: {len(security_issues)}, Complexity issues: {len(complexity_issues)}")
                 
                 # Calculate security risk
                 if security_issues:
@@ -59,17 +67,24 @@ def analyze_pr_risk_context() -> Dict[str, Any]:
                 if quality_score < 70:
                     risk_data["factors"]["coverage"]["score"] = max(0, quality_score - 20)
                     risk_data["factors"]["coverage"]["percentage"] = max(0, quality_score - 20)
+        else:
+            print("Quality gate results file not found - using defaults")
         
         # Load cognitive analysis for complexity details
         cognitive_file = Path('.code-analysis/outputs/cognitive-analysis-results.json')
+        print(f"Looking for cognitive analysis at: {cognitive_file.absolute()}")
         if cognitive_file.exists():
+            print("Cognitive analysis found - loading...")
             with open(cognitive_file, 'r', encoding='utf-8') as f:
                 cognitive_data = json.load(f)
                 
                 total_score = cognitive_data.get('total_score', 0)
+                print(f"Cognitive total score: {total_score}")
                 if total_score and total_score > 50:
                     risk_data["factors"]["complexity"]["score"] = min(10, int(total_score / 10))
                     risk_data["factors"]["complexity"]["cyclomatic"] = total_score
+        else:
+            print("Cognitive analysis file not found - using defaults")
         
         # Calculate overall risk score (max of individual factors)
         factor_scores = [f["score"] for f in risk_data["factors"].values()]
@@ -92,6 +107,8 @@ def analyze_pr_risk_context() -> Dict[str, Any]:
 
 def analyze_file_impact() -> Dict[str, Any]:
     """Analyze file changes for impact visualization"""
+    print("Starting file impact analysis...")
+    
     file_data = {
         "total_files": 0,
         "risk_categories": {
@@ -109,9 +126,39 @@ def analyze_file_impact() -> Dict[str, Any]:
     try:
         # Load diff stats for file analysis
         diff_file = Path('.code-analysis/outputs/diff-stats.json')
+        print(f"Looking for diff stats at: {diff_file.absolute()}")
         if diff_file.exists():
+            print("Diff stats found - loading...")
             with open(diff_file, 'r', encoding='utf-8') as f:
                 diff_data = json.load(f)
+                print(f"Diff data type: {type(diff_data)}, length: {len(diff_data) if isinstance(diff_data, list) else 'N/A'}")
+        else:
+            print("Diff stats JSON not found, trying TXT format...")
+            diff_txt_file = Path('.code-analysis/outputs/diff_stats.txt')
+            print(f"Looking for diff stats TXT at: {diff_txt_file.absolute()}")
+            if diff_txt_file.exists():
+                print("Diff stats TXT found - parsing...")
+                diff_data = []
+                with open(diff_txt_file, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        parts = line.strip().split('\t')
+                        if len(parts) >= 3:
+                            try:
+                                additions = int(parts[0]) if parts[0] != '-' else 0
+                                deletions = int(parts[1]) if parts[1] != '-' else 0
+                                filename = parts[2]
+                                diff_data.append({
+                                    'file': filename,
+                                    'added': additions,
+                                    'removed': deletions,
+                                    'total': additions + deletions
+                                })
+                            except ValueError:
+                                continue
+                print(f"Parsed {len(diff_data)} files from TXT format")
+            else:
+                print("No diff stats files found - using empty data")
+                diff_data = []
                 
                 if isinstance(diff_data, list):
                     file_data["total_files"] = len(diff_data)
@@ -282,7 +329,15 @@ def create_enhanced_visualization():
         with open(output_dir / 'pr_impact_summary.md', 'w', encoding='utf-8') as f:
             f.write(markdown_content)
         
-        # Quiet success - only output if error
+        # Print summary of generated data
+        print("Enhanced PR analysis generated:")
+        print(f"  - Risk score: {risk_data['overall_score']}/10")
+        print(f"  - Total files: {file_data['total_files']}")
+        print(f"  - High risk files: {file_data['risk_categories']['high_risk']['count']}")
+        print(f"  - Actionable insights: {len(insights)}")
+        print(f"  - Time investment: {total_time}")
+        print(f"  - Recommendation: {risk_data['recommendation']}")
+        
         return True
         
     except Exception as e:
