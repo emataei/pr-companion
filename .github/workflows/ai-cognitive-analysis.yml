@@ -1,8 +1,6 @@
 name: AI Cognitive Analysis
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ["Code Quality Analysis"]
     types: [completed]
@@ -14,12 +12,13 @@ permissions:
 jobs:
   ai-cognitive-analysis:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event.workflow_run.conclusion == 'success'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Download quality analysis results

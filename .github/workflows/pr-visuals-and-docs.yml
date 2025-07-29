@@ -1,7 +1,5 @@
 name: PR Visuals and Documentation
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ["Code Quality Analysis", "AI Cognitive Analysis"]
     types: [completed]
@@ -12,12 +10,13 @@ permissions:
 jobs:
   generate-pr-visuals-and-docs:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: github.event.workflow_run.conclusion == 'success'
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
           
       - name: Download code quality analysis results
