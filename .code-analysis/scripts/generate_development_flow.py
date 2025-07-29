@@ -646,11 +646,11 @@ def create_demo_visual():
 
 def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact, enhanced_data=None):
     """Generate the actual visual with provided data following redesign specifications"""
-    # Create clean, simple layout with proper spacing
-    fig = plt.figure(figsize=(12, 8))  # Smaller, more manageable size
-    # Simple grid with good spacing
-    gs = GridSpec(3, 2, height_ratios=[1.2, 1.5, 1.0], hspace=0.4, wspace=0.3, 
-                  top=0.92, bottom=0.08, left=0.08, right=0.92)
+    # Create clean, simple layout with more space for file impact section
+    fig = plt.figure(figsize=(14, 10))  # Larger size for better readability
+    # Adjusted grid with more space for file impact section
+    gs = GridSpec(3, 2, height_ratios=[1.0, 2.0, 1.0], hspace=0.3, wspace=0.3, 
+                  top=0.94, bottom=0.06, left=0.06, right=0.94)
     
     # === TOP LEFT: RISK SCORE (Clean and Simple) ===
     ax_risk = fig.add_subplot(gs[0, 0])
@@ -689,12 +689,12 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_time.set_ylim(0, 1)
     ax_time.axis('off')
     
-    # === MIDDLE: FILE IMPACT (Simplified) ===
+    # === MIDDLE: FILE IMPACT (Improved Layout) ===
     ax_files = fig.add_subplot(gs[1, :])
     total_files = file_impact.get('total_files', len(heatmap_data))
     
-    # Clean title
-    ax_files.text(0.5, 0.9, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
+    # Clean title with more space
+    ax_files.text(0.5, 0.95, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
                  fontsize=16, fontweight='bold', color='#2C3E50')
     
     # Get or create consistent risk categories based on overall risk score
@@ -719,62 +719,75 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     medium_risk_files = risk_categories.get('medium_risk', {}).get('files', [])
     low_risk_files = risk_categories.get('low_risk', {}).get('files', [])
     
-    # HIGH RISK section with dynamic data
-    ax_files.text(0.1, 0.7, f"HIGH RISK ({high_risk_count} files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#E74C3C')
+    # LEFT COLUMN: Risk Categories with improved spacing
+    # HIGH RISK section with better layout
+    ax_files.text(0.05, 0.8, f"HIGH RISK ({high_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#E74C3C')
     if high_risk_files:
         first_high_risk = high_risk_files[0]
-        display_text = f"- {first_high_risk.get('file', 'Security/Critical files')} - {first_high_risk.get('reason', 'High risk changes')}"
-        ax_files.text(0.15, 0.6, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        file_name = first_high_risk.get('file', 'Security/Critical files')
+        reason = first_high_risk.get('reason', 'High risk changes')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.75, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.72, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.15, 0.6, "- No high risk files detected", ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        ax_files.text(0.07, 0.75, "• No high risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
     
-    # MEDIUM RISK section with dynamic data
-    ax_files.text(0.1, 0.45, f"MEDIUM RISK ({medium_risk_count} files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#F39C12')
+    # MEDIUM RISK section with better layout
+    ax_files.text(0.05, 0.65, f"MEDIUM RISK ({medium_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#F39C12')
     if medium_risk_files:
         first_medium_risk = medium_risk_files[0]
-        display_text = f"- {first_medium_risk.get('file', 'Complex files')} - {first_medium_risk.get('reason', 'Needs review')}"
-        ax_files.text(0.15, 0.35, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        file_name = first_medium_risk.get('file', 'Complex files')
+        reason = first_medium_risk.get('reason', 'Needs review')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.6, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.57, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.15, 0.35, "- No medium risk files detected", ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        ax_files.text(0.07, 0.6, "• No medium risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
     
-    # LOW RISK section with dynamic data
-    ax_files.text(0.1, 0.2, f"LOW RISK ({low_risk_count} files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#27AE60')
+    # LOW RISK section with better layout
+    ax_files.text(0.05, 0.5, f"LOW RISK ({low_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#27AE60')
     if low_risk_files:
         first_low_risk = low_risk_files[0]
-        display_text = f"- {first_low_risk.get('file', 'Documentation files')} - {first_low_risk.get('reason', 'Minor changes')}"
-        ax_files.text(0.15, 0.1, display_text[:60] + ("..." if len(display_text) > 60 else ""), ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        file_name = first_low_risk.get('file', 'Documentation files')
+        reason = first_low_risk.get('reason', 'Minor changes')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.45, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.42, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
     else:
-        ax_files.text(0.15, 0.1, "- No low risk files detected", ha='left', va='center', 
-                     fontsize=11, color='#2C3E50')
+        ax_files.text(0.07, 0.45, "• No low risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
     
-    # Dynamic change distribution bars
-    ax_files.text(0.6, 0.7, "Change Distribution:", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#2C3E50')
+    # RIGHT COLUMN: Change Distribution with improved positioning
+    ax_files.text(0.55, 0.8, "Change Distribution:", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#2C3E50')
     
     # Get change distribution data
     change_dist = file_impact.get('change_distribution', {})
     modified_pct = change_dist.get('modified_percentage', 80)
     new_files_pct = change_dist.get('new_files_percentage', 20)
     
-    # Modified files bar (dynamic percentage)
-    mod_width = max(0.05, (modified_pct / 100) * 0.25)  # Scale to max 0.25 width
-    mod_rect = patches.Rectangle((0.6, 0.55), mod_width, 0.08, facecolor='#3498DB', alpha=0.8)
+    # Modified files bar with better positioning
+    bar_width = max(0.05, (modified_pct / 100) * 0.35)  # Scale to max 0.35 width
+    mod_rect = patches.Rectangle((0.55, 0.7), bar_width, 0.06, facecolor='#3498DB', alpha=0.8)
     ax_files.add_patch(mod_rect)
-    ax_files.text(0.87, 0.59, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.73, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
     
-    # New files bar (dynamic percentage)  
-    new_width = max(0.02, (new_files_pct / 100) * 0.25)  # Scale to max 0.25 width
-    new_rect = patches.Rectangle((0.6, 0.4), new_width, 0.08, facecolor='#27AE60', alpha=0.8)
+    # New files bar with better positioning
+    new_bar_width = max(0.03, (new_files_pct / 100) * 0.35)  # Scale to max 0.35 width
+    new_rect = patches.Rectangle((0.55, 0.6), new_bar_width, 0.06, facecolor='#27AE60', alpha=0.8)
     ax_files.add_patch(new_rect)
-    ax_files.text(0.87, 0.44, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.63, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
     
     ax_files.set_xlim(0, 1)
     ax_files.set_ylim(0, 1)
