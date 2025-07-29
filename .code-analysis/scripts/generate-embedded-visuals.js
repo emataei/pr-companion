@@ -25,7 +25,7 @@ function generateGitHubPagesUrl(filename) {
 /**
  * Generate display options for an image with GitHub Pages URL only
  */
-function generateImageDisplayOptions(imagePath, title, base64Data, forceCompact = false) {
+function generateImageDisplayOptions(imagePath, title, forceCompact = false) {
   const fileName = path.basename(imagePath);
   const githubPagesUrl = generateGitHubPagesUrl(fileName);
   let content = `### ${title}\n\n`;
@@ -119,11 +119,11 @@ function generateEnhancedImageReport() {
     
     if (imagePath) {
       hasImages = true;
-      const imageContent = generateImageDisplayOptions(imagePath, title, null, false);
+      const imageContent = generateImageDisplayOptions(imagePath, title, false);
       reportContent += imageContent;
       console.log(`Found and processed ${filename}`);
     } else {
-      const noImageContent = generateImageDisplayOptions(filename, title, null, false);
+      const noImageContent = generateImageDisplayOptions(filename, title, false);
       reportContent += noImageContent;
       console.log(`Image not found: ${filename}`);
     }
