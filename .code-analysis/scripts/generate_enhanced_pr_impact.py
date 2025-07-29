@@ -159,60 +159,61 @@ def analyze_file_impact() -> Dict[str, Any]:
             else:
                 print("No diff stats files found - using empty data")
                 diff_data = []
+        
+        # Process the diff data regardless of source (JSON or TXT)
+        if isinstance(diff_data, list):
+            file_data["total_files"] = len(diff_data)
+            
+            modified_count = 0
+            new_count = 0
+            deleted_count = 0
+            
+            for file_info in diff_data:
+                file_path = file_info.get('file', '')
+                added = file_info.get('added', 0)
+                removed = file_info.get('removed', 0)
                 
-                if isinstance(diff_data, list):
-                    file_data["total_files"] = len(diff_data)
-                    
-                    modified_count = 0
-                    new_count = 0
-                    deleted_count = 0
-                    
-                    for file_info in diff_data:
-                        file_path = file_info.get('file', '')
-                        added = file_info.get('added', 0)
-                        removed = file_info.get('removed', 0)
-                        
-                        # Categorize file risk
-                        if any(pattern in file_path.lower() for pattern in ['auth', 'security', 'password', 'token', 'payment', 'billing']):
-                            file_data["risk_categories"]["high_risk"]["files"].append({
-                                "path": file_path,
-                                "reason": "Security/Business critical"
-                            })
-                        elif any(pattern in file_path.lower() for pattern in ['migration', 'schema', 'database', 'db/', 'api/', 'core/']):
-                            file_data["risk_categories"]["high_risk"]["files"].append({
-                                "path": file_path,
-                                "reason": "Data integrity/Core system"
-                            })
-                        elif added + removed > 100:
-                            file_data["risk_categories"]["medium_risk"]["files"].append({
-                                "path": file_path,
-                                "reason": "Large changes need review"
-                            })
-                        else:
-                            file_data["risk_categories"]["low_risk"]["files"].append({
-                                "path": file_path,
-                                "reason": "Minor changes"
-                            })
-                        
-                        # Track change types
-                        if removed == 0 and added > 0:
-                            new_count += 1
-                        elif added == 0 and removed > 0:
-                            deleted_count += 1
-                        else:
-                            modified_count += 1
-                    
-                    # Calculate percentages
-                    total = len(diff_data)
-                    if total > 0:
-                        file_data["change_distribution"]["modified_percentage"] = int((modified_count / total) * 100)
-                        file_data["change_distribution"]["new_files_percentage"] = int((new_count / total) * 100)
-                        file_data["change_distribution"]["deleted_percentage"] = int((deleted_count / total) * 100)
-                    
-                    # Update counts
-                    file_data["risk_categories"]["high_risk"]["count"] = len(file_data["risk_categories"]["high_risk"]["files"])
-                    file_data["risk_categories"]["medium_risk"]["count"] = len(file_data["risk_categories"]["medium_risk"]["files"])
-                    file_data["risk_categories"]["low_risk"]["count"] = len(file_data["risk_categories"]["low_risk"]["files"])
+                # Categorize file risk
+                if any(pattern in file_path.lower() for pattern in ['auth', 'security', 'password', 'token', 'payment', 'billing']):
+                    file_data["risk_categories"]["high_risk"]["files"].append({
+                        "path": file_path,
+                        "reason": "Security/Business critical"
+                    })
+                elif any(pattern in file_path.lower() for pattern in ['migration', 'schema', 'database', 'db/', 'api/', 'core/']):
+                    file_data["risk_categories"]["high_risk"]["files"].append({
+                        "path": file_path,
+                        "reason": "Data integrity/Core system"
+                    })
+                elif added + removed > 100:
+                    file_data["risk_categories"]["medium_risk"]["files"].append({
+                        "path": file_path,
+                        "reason": "Large changes need review"
+                    })
+                else:
+                    file_data["risk_categories"]["low_risk"]["files"].append({
+                        "path": file_path,
+                        "reason": "Minor changes"
+                    })
+                
+                # Track change types
+                if removed == 0 and added > 0:
+                    new_count += 1
+                elif added == 0 and removed > 0:
+                    deleted_count += 1
+                else:
+                    modified_count += 1
+            
+            # Calculate percentages
+            total = len(diff_data)
+            if total > 0:
+                file_data["change_distribution"]["modified_percentage"] = int((modified_count / total) * 100)
+                file_data["change_distribution"]["new_files_percentage"] = int((new_count / total) * 100)
+                file_data["change_distribution"]["deleted_percentage"] = int((deleted_count / total) * 100)
+            
+            # Update counts
+            file_data["risk_categories"]["high_risk"]["count"] = len(file_data["risk_categories"]["high_risk"]["files"])
+            file_data["risk_categories"]["medium_risk"]["count"] = len(file_data["risk_categories"]["medium_risk"]["files"])
+            file_data["risk_categories"]["low_risk"]["count"] = len(file_data["risk_categories"]["low_risk"]["files"])
                     
     except Exception as e:
         print(f"Warning: Could not analyze file impact: {e}")

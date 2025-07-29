@@ -341,11 +341,11 @@ jobs:
         with:
           name: ai-cognitive-analysis-results
           path: |
-            ai_pre_review.json
-            cognitive_analysis.json
-            intent_classification.json
-            impact_prediction.json
-            semantic_commit_analysis.json
+            ai-pre-review-results.json
+            .code-analysis/outputs/cognitive_analysis.json
+            intent-classification-results.json
+            impact-prediction-results.json
+            semantic-commit-analysis.json
         if: always()
 
   # Job 3: PR Visuals and Documentation (Depends on both previous jobs)
