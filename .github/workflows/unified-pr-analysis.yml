@@ -358,20 +358,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          
-      - name: Download code quality analysis results
-        uses: actions/download-artifact@v4
-        with:
-          name: code-quality-analysis-results
-          path: ./.code-analysis/outputs/
-        continue-on-error: true
-        
-      - name: Download AI cognitive analysis results
-        uses: actions/download-artifact@v4
-        with:
-          name: ai-cognitive-analysis-results
-          path: ./.code-analysis/outputs/
-        continue-on-error: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -391,22 +377,31 @@ jobs:
           mkdir -p .github/scripts
           echo "Created clean output directories"
           
+      - name: Download code quality analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: code-quality-analysis-results
+          path: ./.code-analysis/outputs/
+        continue-on-error: true
+        
+      - name: Download AI cognitive analysis results
+        uses: actions/download-artifact@v4
+        with:
+          name: ai-cognitive-analysis-results
+          path: ./.code-analysis/outputs/
+        continue-on-error: true
+
       - name: Verify analysis artifacts
         run: |
           echo "Checking for downloaded analysis results..."
-          # Copy quality gate results to the expected location if it exists in root
-          if [ -f "quality-gate-results.json" ]; then
-            echo "Found quality gate results in root, copying to outputs directory..."
-            cp quality-gate-results.json .code-analysis/outputs/
-          fi
           echo "Code quality results:"
           ls -la .code-analysis/outputs/ | grep -E "(quality|gate)" || echo "No quality gate results found"
           echo "AI cognitive results:"
           ls -la .code-analysis/outputs/ | grep -E "(cognitive|ai_pre)" || echo "No cognitive analysis results found"
           echo "Current working directory contents:"
           find .code-analysis/outputs -name "*.json" -exec echo "Found: {}" \;
-          echo "Root directory JSON files:"
-          ls -la *.json || echo "No JSON files in root"
+          echo "All files in outputs directory:"
+          ls -la .code-analysis/outputs/ || echo "No files in outputs directory"
 
       - name: Install dependencies
         run: |
