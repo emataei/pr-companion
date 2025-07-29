@@ -7,7 +7,6 @@ Simple, clean visual summary for reviewers
 import os
 import sys
 import json
-import base64
 from io import BytesIO
 from pathlib import Path
 
@@ -19,8 +18,8 @@ except ImportError:
     MATPLOTLIB_AVAILABLE = False
 
 
-def save_image_with_base64(fig, base_filename, title="PR Summary"):
-    """Save image as PNG and create base64 + markdown files"""
+def save_image_with_base64(fig, base_filename):
+    """Save image as PNG only (no base64 generation for GitHub Pages deployment)"""
     # Use standardized output directory
     output_dir = Path(__file__).parent.parent / 'outputs'  # .code-analysis/outputs
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -43,7 +42,7 @@ def save_image_with_base64(fig, base_filename, title="PR Summary"):
     
     dpi = 80
     # If too large, reduce DPI and try again
-    max_raw_size = 45 * 1024  # 45KB raw = ~60KB base64 (under 64KB GitHub limit)
+    max_raw_size = 45 * 1024  # 45KB raw for optimal loading
     if raw_size > max_raw_size:
         print(f"Image too large ({raw_size/1024:.1f}KB), reducing DPI from {dpi} to 60")
         dpi = 60
@@ -72,44 +71,10 @@ def save_image_with_base64(fig, base_filename, title="PR Summary"):
     # Get file size
     size_kb = png_path.stat().st_size / 1024
     
-    # Create base64 version
-    with open(png_path, "rb") as img_file:
-        img_data = img_file.read()
-        base64_data = base64.b64encode(img_data).decode('utf-8')
-        data_uri = f"data:image/png;base64,{base64_data}"
-    
-    # Check final base64 size
-    final_size = len(data_uri)
-    github_limit = 64 * 1024  # 64KB
-    
-    if final_size > github_limit:
-        print(f"Warning: Base64 size ({final_size/1024:.1f}KB) exceeds GitHub limit ({github_limit/1024}KB)")
-        # Create a placeholder instead
-        placeholder_content = "Image too large for GitHub comment display. Available in workflow artifacts."
-        base64_path = output_dir / f"{base_filename}_base64.txt"
-        with open(base64_path, 'w') as f:
-            f.write(placeholder_content)
-        
-        markdown_path = output_dir / f"{base_filename}_embed.md"
-        with open(markdown_path, 'w') as f:
-            f.write(f"{placeholder_content}\n")
-        
-        return png_path, base64_path, markdown_path
-    
-    # Save base64 text file
-    base64_path = output_dir / f"{base_filename}_base64.txt"
-    with open(base64_path, 'w') as f:
-        f.write(data_uri)
-    
-    # Create markdown embedding file
-    markdown_path = output_dir / f"{base_filename}_embed.md"
-    with open(markdown_path, 'w') as f:
-        f.write(f"![{title}]({data_uri})\n")
-    
     print(f"Generated optimized {base_filename}: {size_kb:.1f} KB (DPI: {dpi})")
-    print(f"Base64 encoded: {len(base64_data):,} characters")
+    print(f"PNG file saved to: {png_path}")
     
-    return png_path, base64_path, markdown_path
+    return png_path
 
 
 def load_pr_summary():
@@ -184,8 +149,8 @@ def generate_simple_summary():
     
     plt.tight_layout()
     
-    # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'story_arc', 'PR Summary')
+    # Save with PNG-only (no base64 for GitHub Pages deployment)
+    save_image_with_base64(fig, 'story_arc')
     plt.close()
     
     return True
@@ -203,8 +168,8 @@ def create_no_data_summary():
     
     plt.tight_layout()
     
-    # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'story_arc', 'PR Summary')
+    # Save with PNG-only (no base64 for GitHub Pages deployment)
+    save_image_with_base64(fig, 'story_arc')
     plt.close()
     
     return True

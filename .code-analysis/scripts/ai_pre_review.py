@@ -99,6 +99,26 @@ class AIPreReviewBot:
         
         return 'other'
     
+    def load_quality_gate_results(self) -> Optional[Dict]:
+        """Load quality gate results from code quality analysis"""
+        possible_paths = [
+            './quality-results/quality-gate-results.json',
+            './.code-analysis/outputs/quality-gate-results.json',
+            './quality-gate-results.json'
+        ]
+        
+        for path in possible_paths:
+            if Path(path).exists():
+                try:
+                    with open(path, 'r') as f:
+                        return json.load(f)
+                except Exception as e:
+                    print(f"Error loading quality gate results from {path}: {e}")
+                    continue
+        
+        print("No quality gate results found")
+        return None
+    
     def analyze_file_types(self, files: List[str]) -> Dict[str, List[str]]:
         """Categorize files by type"""
         categories = {category: [] for category in FILE_PATTERNS.keys()}
@@ -203,7 +223,7 @@ class AIPreReviewBot:
         
         return risk_level
 
-    def generate_ai_summary(self, diff: str, files: List[str]) -> Dict[str, str]:
+    def generate_ai_summary(self, diff: str, files: List[str], quality_results: Optional[Dict] = None) -> Dict[str, str]:
         """Generate AI-powered summary of changes"""
         if not self.ai_client:
             return {
@@ -216,11 +236,21 @@ class AIPreReviewBot:
         # Create a focused prompt for better analysis
         file_list = ', '.join(files[:10]) + ("..." if len(files) > 10 else "")
         
+        # Include quality gate results if available
+        quality_context = ""
+        if quality_results:
+            quality_context = f"""
+        
+        Code Quality Analysis Results:
+        {json.dumps(quality_results, indent=2)[:1000]}
+        
+        """
+        
         prompt = f"""
         Analyze this code change and provide a comprehensive review summary.
         
         Files changed ({len(files)}): {file_list}
-        
+        {quality_context}
         Code diff:
         {diff[:3000]}  # Truncate very long diffs
         
@@ -233,6 +263,7 @@ class AIPreReviewBot:
         2. **Business Impact**: How does this affect users, features, or business logic?
         3. **Technical Changes**: What are the key implementation details?
         4. **Risk Assessment**: What potential issues or concerns should reviewers watch for?
+        """ + ("5. **Quality Gate Results**: Based on the code quality analysis results above, highlight any critical findings or issues that need attention." if quality_results else "") + """
         
         For the summary section, ALWAYS use bullet points (•) to make it easy to scan and understand quickly. Each bullet should be concise and focused on one key change or improvement.
         """
@@ -341,12 +372,16 @@ class AIPreReviewBot:
         files = self.get_changed_files()
         diff = self.get_pr_diff()
         
+        # Load quality gate results from code quality analysis
+        quality_results = self.load_quality_gate_results()
+        
         if not files:
             return {
                 "summary": "No changes to analyze",
                 "risk_level": "NONE",
                 "file_categories": {},
                 "risk_factors": [],
+                "quality_gate": quality_results,
                 "ai_analysis": {
                     "summary": "No changes to analyze",
                     "business_impact": "None",
@@ -365,7 +400,7 @@ class AIPreReviewBot:
         risk_level = self._adjust_risk_with_cognitive_analysis(risk_level, risk_factors)
         
         # Generate AI summary
-        ai_analysis = self.generate_ai_summary(diff, files)
+        ai_analysis = self.generate_ai_summary(diff, files, quality_results)
         
         return {
             "summary": ai_analysis["summary"],
@@ -373,6 +408,7 @@ class AIPreReviewBot:
             "risk_factors": risk_factors,
             "file_categories": categories,
             "file_count": len(files),
+            "quality_gate": quality_results,
             "ai_analysis": ai_analysis
         }
 
@@ -381,8 +417,11 @@ def main():
     bot = AIPreReviewBot()
     results = bot.run_analysis()
     
+    # Ensure outputs directory exists  
+    os.makedirs('.code-analysis/outputs', exist_ok=True)
+    
     # Save results for the GitHub Action
-    with open('ai-pre-review-results.json', 'w') as f:
+    with open('.code-analysis/outputs/ai-pre-review-results.json', 'w') as f:
         json.dump(results, f, indent=2)
     
     print(f"AI Pre-Review analysis complete. Risk: {results['risk_level']}")

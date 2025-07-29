@@ -8,23 +8,12 @@ module.exports = async ({ github, context }) => {
     return;
   }
 
-  const results = loadResults('intent-classification-results.json', { 
-    primary_intent: 'maintenance',
-    confidence: 0.3,
-    secondary_intents: [],
-    reasoning: 'Intent classification analysis failed',
-    affected_areas: ['unknown'],
-    business_impact: 'Unable to determine without AI analysis',
-    technical_details: 'Manual review required for detailed analysis',
-    file_changes_summary: {
-      total_files: 0,
-      files_added: 0,
-      files_modified: 0,
-      files_deleted: 0,
-      total_lines_added: 0,
-      total_lines_removed: 0
-    }
-  });
+  const results = loadResults('.code-analysis/outputs/intent-classification-results.json', null);
+
+  if (!results) {
+    console.log('Intent classification results not found - analysis may have failed');
+    return;
+  }
 
   const comment = buildComment(results);
   

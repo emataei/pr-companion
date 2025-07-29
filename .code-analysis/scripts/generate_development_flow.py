@@ -7,7 +7,6 @@ Focused visual showing risk score, file changes, and actionable insights
 import json
 import os
 import sys
-import base64
 from io import BytesIO
 from pathlib import Path
 import subprocess
@@ -27,8 +26,8 @@ except ImportError:
 OUTPUT_DIR = Path(__file__).parent.parent / 'outputs'  # Always .code-analysis/outputs
 
 
-def save_image_with_base64(fig, base_filename, title="Development Flow"):
-    """Save image as PNG and create base64 + markdown files"""
+def save_image_with_base64(fig, base_filename):
+    """Save image as PNG only (no base64 generation for GitHub Pages deployment)"""
     # Use the standardized output directory
     output_dir = OUTPUT_DIR
     
@@ -38,91 +37,57 @@ def save_image_with_base64(fig, base_filename, title="Development Flow"):
     # Print output directory for debugging
     print(f"Saving image to: {output_dir.absolute()}")
     
-    # Save PNG file with size optimization
+    # Save PNG file with improved quality settings
     png_path = output_dir / f"{base_filename}.png"
     
-    # First save to check raw file size
-    temp_buffer = BytesIO()
-    fig.savefig(
-        temp_buffer,
-        format='png',
-        dpi=80,
-        bbox_inches='tight',
-        facecolor='white'
-    )
-    temp_buffer.seek(0)
-    raw_size = len(temp_buffer.getvalue())
-    temp_buffer.close()
+    # Start with higher DPI for better quality
+    dpi_options = [120, 100, 80]  # Try high quality first, then step down if needed
+    max_file_size = 100 * 1024    # Increased to 100KB for better quality
     
-    dpi = 80
-    # If too large, reduce DPI and try again
-    max_raw_size = 45 * 1024  # 45KB raw = ~60KB base64 (under 64KB GitHub limit)
-    if raw_size > max_raw_size:
-        print(f"Image too large ({raw_size/1024:.1f}KB), reducing DPI from {dpi} to 60")
-        dpi = 60
-        
-        # Try again with lower DPI
+    final_dpi = dpi_options[0]
+    
+    for dpi in dpi_options:
+        # Test save to check file size
         temp_buffer = BytesIO()
         fig.savefig(
             temp_buffer,
             format='png',
             dpi=dpi,
             bbox_inches='tight',
-            facecolor='white'
+            facecolor='white',
+            edgecolor='none'  # Ensure clean edges
         )
         temp_buffer.seek(0)
-        raw_size = len(temp_buffer.getvalue())
+        file_size = len(temp_buffer.getvalue())
         temp_buffer.close()
         
-        # If still too large, reduce further
-        if raw_size > max_raw_size:
-            print(f"Still too large ({raw_size/1024:.1f}KB), reducing DPI to 40")
-            dpi = 40
+        print(f"Testing DPI {dpi}: {file_size/1024:.1f}KB")
+        
+        if file_size <= max_file_size:
+            final_dpi = dpi
+            break
+        elif dpi == dpi_options[-1]:
+            # If even the lowest DPI is too large, use it anyway for quality
+            print(f"Warning: Image exceeds {max_file_size/1024:.0f}KB limit, using DPI {dpi} anyway")
+            final_dpi = dpi
+
+    # Save PNG file with selected DPI
+    fig.savefig(
+        png_path, 
+        dpi=final_dpi, 
+        bbox_inches='tight', 
+        facecolor='white',
+        edgecolor='none',
+        pad_inches=0.1  # Small padding for cleaner appearance
+    )
     
-    # Save PNG file with optimized DPI
-    fig.savefig(png_path, dpi=dpi, bbox_inches='tight', facecolor='white')
-    
-    # Get file size
+    # Get final file size
     size_kb = png_path.stat().st_size / 1024
     
-    # Create base64 version
-    with open(png_path, "rb") as img_file:
-        img_data = img_file.read()
-        base64_data = base64.b64encode(img_data).decode('utf-8')
-        data_uri = f"data:image/png;base64,{base64_data}"
+    print(f"Generated high-quality {base_filename}: {size_kb:.1f} KB (DPI: {final_dpi})")
+    print(f"PNG file saved to: {png_path}")
     
-    # Check final base64 size
-    final_size = len(data_uri)
-    github_limit = 64 * 1024  # 64KB
-    
-    if final_size > github_limit:
-        print(f"Warning: Base64 size ({final_size/1024:.1f}KB) exceeds GitHub limit ({github_limit/1024}KB)")
-        # Create a placeholder instead
-        placeholder_content = "Image too large for GitHub comment display. Available in workflow artifacts."
-        base64_path = output_dir / f"{base_filename}_base64.txt"
-        with open(base64_path, 'w') as f:
-            f.write(placeholder_content)
-        
-        markdown_path = output_dir / f"{base_filename}_embed.md"
-        with open(markdown_path, 'w') as f:
-            f.write(f"{placeholder_content}\n")
-        
-        return png_path, base64_path, markdown_path
-    
-    # Save base64 text file
-    base64_path = output_dir / f"{base_filename}_base64.txt"
-    with open(base64_path, 'w') as f:
-        f.write(data_uri)
-    
-    # Create markdown embedding file
-    markdown_path = output_dir / f"{base_filename}_embed.md"
-    with open(markdown_path, 'w') as f:
-        f.write(f"![{title}]({data_uri})\n")
-    
-    print(f"Generated optimized {base_filename}: {size_kb:.1f} KB (DPI: {dpi})")
-    print(f"Base64 encoded: {len(base64_data):,} characters")
-    
-    return png_path, base64_path, markdown_path
+    return png_path
 
 
 def calculate_risk_score():
@@ -179,12 +144,14 @@ def calculate_risk_score():
         # Convert to 1-10 scale and categorize
         risk_score = min(10, max(1, risk_score))
         
-        if risk_score >= 7:
-            return risk_score, "High", "#E74C3C"  # Red
-        elif risk_score >= 4:
-            return risk_score, "Medium", "#F39C12"  # Orange
+        if risk_score >= 8:
+            return risk_score, "CRITICAL", "#E74C3C"  # Red
+        elif risk_score >= 5:
+            return risk_score, "HIGH", "#F39C12"  # Orange
+        elif risk_score >= 3:
+            return risk_score, "MEDIUM", "#F1C40F"  # Yellow
         else:
-            return risk_score, "Low", "#2ECC71"  # Green
+            return risk_score, "LOW", "#2ECC71"  # Green
             
     except Exception as e:
         print(f"Error calculating risk score: {e}")
@@ -519,6 +486,104 @@ def get_time_color(review_time):
         return "#2ECC71"  # Green for under 1 hour
 
 
+def create_consistent_risk_categories(diff_stats, overall_risk_score):
+    """Create file risk categories that are consistent with the overall risk score"""
+    if not diff_stats:
+        return {
+            'high_risk': {'count': 0, 'files': []},
+            'medium_risk': {'count': 0, 'files': []},
+            'low_risk': {'count': 0, 'files': []}
+        }
+    
+    high_risk_extensions = {'.py', '.js', '.ts', '.tsx', '.jsx', '.java', '.cpp', '.cs'}
+    config_extensions = {'.json', '.yaml', '.yml', '.xml', '.config'}
+    
+    high_risk_files = []
+    medium_risk_files = []
+    low_risk_files = []
+    
+    # Sort files by total changes to prioritize
+    sorted_files = sorted(diff_stats, key=lambda x: x['total'], reverse=True)
+    
+    for file_data in sorted_files:
+        file_path = file_data['file']
+        total_changes = file_data['total']
+        file_ext = Path(file_path).suffix.lower()
+        
+        # Determine risk level based on multiple factors
+        risk_factors = 0
+        reasons = []
+        
+        # Factor 1: File type
+        if file_ext in high_risk_extensions:
+            risk_factors += 2
+            reasons.append("critical code file")
+        elif file_ext in config_extensions:
+            risk_factors += 1
+            reasons.append("configuration file")
+        
+        # Factor 2: Change volume
+        if total_changes > 100:
+            risk_factors += 2
+            reasons.append(f"{total_changes} lines changed")
+        elif total_changes > 50:
+            risk_factors += 1
+            reasons.append(f"{total_changes} lines changed")
+        
+        # Factor 3: Deletion ratio (high deletions = higher risk)
+        deletions = file_data.get('deletions', 0)
+        if total_changes > 0:
+            deletion_ratio = deletions / total_changes
+            if deletion_ratio > 0.5:
+                risk_factors += 1
+                reasons.append("high deletion ratio")
+        
+        # Factor 4: Path complexity (deep nesting may indicate core files)
+        path_depth = len(Path(file_path).parts)
+        if path_depth > 3:
+            risk_factors += 1
+            reasons.append("deep path structure")
+        
+        # Categorize based on risk factors
+        reason_text = ", ".join(reasons) if reasons else "minor changes"
+        file_info = {
+            'file': Path(file_path).name,
+            'full_path': file_path,
+            'reason': reason_text,
+            'changes': total_changes
+        }
+        
+        if risk_factors >= 3:
+            high_risk_files.append(file_info)
+        elif risk_factors >= 1:
+            medium_risk_files.append(file_info)
+        else:
+            low_risk_files.append(file_info)
+    
+    # If overall risk is high but we have no high-risk files, promote some medium-risk files
+    if overall_risk_score >= 5 and len(high_risk_files) == 0 and len(medium_risk_files) > 0:
+        # Promote the top medium-risk files to high-risk
+        files_to_promote = min(2, len(medium_risk_files))
+        for _ in range(files_to_promote):
+            file_info = medium_risk_files.pop(0)
+            file_info['reason'] = f"high overall PR risk, {file_info['reason']}"
+            high_risk_files.append(file_info)
+    
+    # If overall risk is medium but we have no medium-risk files, promote some low-risk files
+    elif overall_risk_score >= 3 and len(medium_risk_files) == 0 and len(low_risk_files) > 0:
+        files_to_promote = min(2, len(low_risk_files))
+        for _ in range(files_to_promote):
+            file_info = low_risk_files.pop(0)
+            file_info['reason'] = f"medium overall PR risk, {file_info['reason']}"
+            medium_risk_files.append(file_info)
+    
+    return {
+        'high_risk': {'count': len(high_risk_files), 'files': high_risk_files},
+        'medium_risk': {'count': len(medium_risk_files), 'files': medium_risk_files},
+        'low_risk': {'count': len(low_risk_files), 'files': low_risk_files}
+    }
+
+
 def get_file_change_color(change_type):
     """Get color for file change type"""
     colors = {
@@ -576,16 +641,16 @@ def create_demo_visual():
         'total_lines_changed': 342
     }
     
-    return generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact)
+    return generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact, None)
 
 
-def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact):
+def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, time_color, heatmap_data, file_impact, enhanced_data=None):
     """Generate the actual visual with provided data following redesign specifications"""
-    # Create clean, simple layout with proper spacing
-    fig = plt.figure(figsize=(12, 8))  # Smaller, more manageable size
-    # Simple grid with good spacing
-    gs = GridSpec(3, 2, height_ratios=[1.2, 1.5, 1.0], hspace=0.4, wspace=0.3, 
-                  top=0.92, bottom=0.08, left=0.08, right=0.92)
+    # Create clean, simple layout with more space for file impact section
+    fig = plt.figure(figsize=(14, 10))  # Larger size for better readability
+    # Adjusted grid with more space for file impact section
+    gs = GridSpec(3, 2, height_ratios=[1.0, 2.0, 1.0], hspace=0.3, wspace=0.3, 
+                  top=0.94, bottom=0.06, left=0.06, right=0.94)
     
     # === TOP LEFT: RISK SCORE (Clean and Simple) ===
     ax_risk = fig.add_subplot(gs[0, 0])
@@ -624,43 +689,105 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_time.set_ylim(0, 1)
     ax_time.axis('off')
     
-    # === MIDDLE: FILE IMPACT (Simplified) ===
+    # === MIDDLE: FILE IMPACT (Improved Layout) ===
     ax_files = fig.add_subplot(gs[1, :])
     total_files = file_impact.get('total_files', len(heatmap_data))
     
-    # Clean title
-    ax_files.text(0.5, 0.9, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
+    # Clean title with more space
+    ax_files.text(0.5, 0.95, f"File Impact Summary ({total_files} files)", ha='center', va='center', 
                  fontsize=16, fontweight='bold', color='#2C3E50')
     
-    # Simple file categories without complex styling
-    ax_files.text(0.1, 0.7, "HIGH RISK (1 files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#E74C3C')
-    ax_files.text(0.15, 0.6, "- /api/auth/* - Security vulnerability", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    # Get or create consistent risk categories based on overall risk score
+    risk_categories = file_impact.get('risk_categories', {})
     
-    ax_files.text(0.1, 0.45, "MEDIUM RISK (2 files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#F39C12')
-    ax_files.text(0.15, 0.35, "- Complex refactoring needs review", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    # If risk categories are empty or inconsistent, create consistent ones
+    if (not risk_categories or 
+        (risk_score >= 5 and risk_categories.get('high_risk', {}).get('count', 0) == 0) or
+        (risk_score >= 3 and risk_categories.get('medium_risk', {}).get('count', 0) == 0 and 
+         risk_categories.get('high_risk', {}).get('count', 0) == 0)):
+        
+        # Load diff stats to create consistent categories
+        diff_stats = load_diff_stats()
+        risk_categories = create_consistent_risk_categories(diff_stats, risk_score)
     
-    ax_files.text(0.1, 0.2, "LOW RISK (5 files)", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#27AE60')
-    ax_files.text(0.15, 0.1, "- Documentation and formatting", ha='left', va='center', 
-                 fontsize=11, color='#2C3E50')
+    high_risk_count = risk_categories.get('high_risk', {}).get('count', 0)
+    medium_risk_count = risk_categories.get('medium_risk', {}).get('count', 0)
+    low_risk_count = risk_categories.get('low_risk', {}).get('count', 0)
     
-    # Simple change distribution bars
-    ax_files.text(0.6, 0.7, "Change Distribution:", ha='left', va='center', 
-                 fontsize=12, fontweight='bold', color='#2C3E50')
+    # Get actual file examples if available
+    high_risk_files = risk_categories.get('high_risk', {}).get('files', [])
+    medium_risk_files = risk_categories.get('medium_risk', {}).get('files', [])
+    low_risk_files = risk_categories.get('low_risk', {}).get('files', [])
     
-    # Modified files bar (80%)
-    mod_rect = patches.Rectangle((0.6, 0.55), 0.25, 0.08, facecolor='#3498DB', alpha=0.8)
+    # LEFT COLUMN: Risk Categories with improved spacing
+    # HIGH RISK section with better layout
+    ax_files.text(0.05, 0.85, f"HIGH RISK ({high_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#E74C3C')
+    if high_risk_files:
+        first_high_risk = high_risk_files[0]
+        file_name = first_high_risk.get('file', 'Security/Critical files')
+        reason = first_high_risk.get('reason', 'High risk changes')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.79, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.75, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
+    else:
+        ax_files.text(0.07, 0.79, "• No high risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
+    
+    # MEDIUM RISK section with better layout (more spacing)
+    ax_files.text(0.05, 0.65, f"MEDIUM RISK ({medium_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#F39C12')
+    if medium_risk_files:
+        first_medium_risk = medium_risk_files[0]
+        file_name = first_medium_risk.get('file', 'Complex files')
+        reason = first_medium_risk.get('reason', 'Needs review')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.59, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.55, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
+    else:
+        ax_files.text(0.07, 0.59, "• No medium risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
+    
+    # LOW RISK section with better layout (more spacing)
+    ax_files.text(0.05, 0.45, f"LOW RISK ({low_risk_count} files)", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#27AE60')
+    if low_risk_files:
+        first_low_risk = low_risk_files[0]
+        file_name = first_low_risk.get('file', 'Documentation files')
+        reason = first_low_risk.get('reason', 'Minor changes')
+        # Split into two lines for better readability
+        ax_files.text(0.07, 0.39, f"• {file_name}", ha='left', va='top', 
+                     fontsize=10, color='#2C3E50', fontweight='bold')
+        ax_files.text(0.07, 0.35, f"  {reason}", ha='left', va='top', 
+                     fontsize=9, color='#555555', style='italic')
+    else:
+        ax_files.text(0.07, 0.39, "• No low risk files detected", ha='left', va='top', 
+                     fontsize=10, color='#7F8C8D')
+    
+    # RIGHT COLUMN: Change Distribution with improved positioning
+    ax_files.text(0.55, 0.8, "Change Distribution:", ha='left', va='top', 
+                 fontsize=13, fontweight='bold', color='#2C3E50')
+    
+    # Get change distribution data
+    change_dist = file_impact.get('change_distribution', {})
+    modified_pct = change_dist.get('modified_percentage', 80)
+    new_files_pct = change_dist.get('new_files_percentage', 20)
+    
+    # Modified files bar with better positioning
+    bar_width = max(0.05, (modified_pct / 100) * 0.35)  # Scale to max 0.35 width
+    mod_rect = patches.Rectangle((0.55, 0.7), bar_width, 0.06, facecolor='#3498DB', alpha=0.8)
     ax_files.add_patch(mod_rect)
-    ax_files.text(0.87, 0.59, "80% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.73, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
     
-    # New files bar (20%)
-    new_rect = patches.Rectangle((0.6, 0.4), 0.06, 0.08, facecolor='#27AE60', alpha=0.8)
+    # New files bar with better positioning
+    new_bar_width = max(0.03, (new_files_pct / 100) * 0.35)  # Scale to max 0.35 width
+    new_rect = patches.Rectangle((0.55, 0.6), new_bar_width, 0.06, facecolor='#27AE60', alpha=0.8)
     ax_files.add_patch(new_rect)
-    ax_files.text(0.87, 0.44, "20% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.63, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
     
     ax_files.set_xlim(0, 1)
     ax_files.set_ylim(0, 1)
@@ -672,16 +799,30 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_actions.text(0.1, 0.8, "Required Actions (Prioritized)", ha='left', va='center', 
                    fontsize=14, fontweight='bold', color='#2C3E50')
     
-    actions = [
-        "1. Fix security issue in auth.js:L45",
-        "2. Add tests for payment module", 
-        "3. Update API documentation"
-    ]
+    # Get actionable items from enhanced data
+    actions = []
+    action_colors = ['#E74C3C', '#F39C12', '#3498DB', '#9B59B6']
     
-    action_colors = ['#E74C3C', '#F39C12', '#3498DB']
+    if enhanced_data and 'actionable_items' in enhanced_data:
+        actionable_items = enhanced_data['actionable_items']
+        for i, item in enumerate(actionable_items[:3]):  # Limit to top 3 for visual space
+            title = item.get('title', 'Review required')
+            effort = item.get('effort', '?')
+            blocking = item.get('blocking', False)
+            blocking_text = " WARNING" if blocking else ""
+            action_text = f"{i+1}. {title} ({effort}){blocking_text}"
+            actions.append(action_text)
+    else:
+        # Fallback actions if no enhanced data available
+        actions = [
+            "1. Review changed files for quality",
+            "2. Ensure test coverage is adequate", 
+            "3. Update documentation if needed"
+        ]
     
-    for i, (action, color) in enumerate(zip(actions, action_colors)):
+    for i, action in enumerate(actions):
         y_pos = 0.6 - (i * 0.2)
+        color = action_colors[i] if i < len(action_colors) else '#2C3E50'
         ax_actions.text(0.1, y_pos, action, ha='left', va='center', 
                        fontsize=12, color=color, fontweight='bold')
     
@@ -689,13 +830,18 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
     ax_actions.set_ylim(0, 1)
     ax_actions.axis('off')
     
+    # Add timestamp to bottom right corner to ensure unique content
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    fig.text(0.98, 0.02, f"Updated: {current_time}", ha='right', va='bottom', 
+             fontsize=8, color='#7F8C8D', alpha=0.7)
+    
     # Clean title
     fig.suptitle('PR Impact Analysis', fontsize=18, fontweight='bold', y=0.95, color='#2C3E50')
     
     plt.tight_layout()
     
-    # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'PR Impact Analysis')
+    # Save with PNG-only (no base64 for GitHub Pages deployment)
+    save_image_with_base64(fig, 'development_flow')
     plt.close()
     
     return True
@@ -747,7 +893,7 @@ def generate_impact_grid():
     
     return generate_visual_with_data(visual_risk_score, visual_risk_level, visual_risk_color, 
                                    visual_review_time, visual_time_color, visual_heatmap_data, 
-                                   visual_file_impact)
+                                   visual_file_impact, enhanced_data)
 
 
 def create_no_data_visual():
@@ -766,7 +912,8 @@ def create_no_data_visual():
     plt.tight_layout()
     
     # Save with base64 encoding for PR embedding
-    save_image_with_base64(fig, 'development_flow', 'PR Impact Grid')
+    # Save with PNG-only (no base64 for GitHub Pages deployment)  
+    save_image_with_base64(fig, 'development_flow')
     plt.close()
     
     return True

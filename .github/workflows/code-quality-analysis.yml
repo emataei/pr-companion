@@ -1,11 +1,14 @@
-name: Code Quality Analysis
+name: Code Quality Analysis (DISABLED - Using Unified Workflow)
+# DISABLED: This workflow has been replaced by unified-pr-analysis.yml
 on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:  # Manual trigger only - this workflow is disabled
+# Old triggers (disabled):
+#   push:
+#     branches:
+#       - master
+#       - main
+#   pull_request:
+#     types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
