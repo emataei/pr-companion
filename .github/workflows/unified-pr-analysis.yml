@@ -244,9 +244,37 @@ jobs:
           CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          python .code-analysis/scripts/run_cognitive_analysis.py
-          echo "Cognitive complexity analysis complete"
+          echo "Starting cognitive analysis..."
+          echo "Python path: $PYTHONPATH"
+          echo "Current directory: $(pwd)"
+          echo "Changed files: $CHANGED_FILES"
+          echo "AI Foundry endpoint set: $([[ -n "$AI_FOUNDRY_ENDPOINT" ]] && echo "yes" || echo "no")"
+          
+          # Run with verbose error reporting
+          python -u .code-analysis/scripts/run_cognitive_analysis.py 2>&1 || {
+            echo "Cognitive analysis script failed with exit code $?"
+            echo "Let's check what files were created anyway..."
+            ls -la .code-analysis/outputs/ || echo "No outputs directory"
+            echo "Script completed with errors but continuing..."
+          }
+          
+          echo "Cognitive complexity analysis step completed"
         continue-on-error: true
+
+      - name: Debug cognitive analysis results
+        run: |
+          echo "Checking if cognitive analysis created output files..."
+          if [ -f ".code-analysis/outputs/cognitive_analysis.json" ]; then
+            echo "✓ cognitive_analysis.json was created successfully"
+            echo "File size: $(stat --format=%s .code-analysis/outputs/cognitive_analysis.json) bytes"
+            echo "First few lines:"
+            head -5 .code-analysis/outputs/cognitive_analysis.json
+          else
+            echo "✗ cognitive_analysis.json was NOT created"
+            echo "This means the cognitive analysis script failed completely"
+            echo "Available files in outputs directory:"
+            ls -la .code-analysis/outputs/ || echo "No outputs directory exists"
+          fi
 
       - name: Run AI Pre-Review Analysis
         env:
