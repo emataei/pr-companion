@@ -146,6 +146,11 @@ async function createOrUpdateComment(github, context, prNumber, commentBody, ide
  */
 async function setLabels(github, context, prNumber, labels) {
   try {
+    if (!context.repo || !context.repo.owner || !context.repo.repo) {
+      console.log('Missing repository context for setting labels');
+      return;
+    }
+    
     await github.rest.issues.setLabels({
       owner: context.repo.owner,
       repo: context.repo.repo,

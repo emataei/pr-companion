@@ -164,30 +164,58 @@ jobs:
           rm -f gh-pages/pr/${{ github.event.pull_request.number }}/*.svg
           rm -f gh-pages/pr/${{ github.event.pull_request.number }}/test.txt
           
-          # Copy all generated PNG and GIF files to gh-pages
+          # Copy all generated PNG and GIF files to gh-pages with commit hash for cache busting
           if [ -d ".code-analysis/outputs" ]; then
-            echo "Copying visual files to gh-pages..."
+            echo "Copying visual files to gh-pages with commit hash..."
             # List what files are available
             echo "Available output files:"
             ls -la .code-analysis/outputs/
-            # Copy PNG files
+            
+            COMMIT_SHA="${{ github.sha }}"
+            SHORT_SHA="${COMMIT_SHA:0:8}"
+            
+            # Copy PNG files with commit hash
             if ls .code-analysis/outputs/*.png 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.png gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied PNG files"
+              for file in .code-analysis/outputs/*.png; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No PNG files found"
             fi
-            # Copy GIF files
+            # Copy GIF files with commit hash
             if ls .code-analysis/outputs/*.gif 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.gif gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied GIF files"
+              for file in .code-analysis/outputs/*.gif; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No GIF files found"
             fi
-            # Copy SVG files
+            # Copy SVG files with commit hash
             if ls .code-analysis/outputs/*.svg 1> /dev/null 2>&1; then
-              cp .code-analysis/outputs/*.svg gh-pages/pr/${{ github.event.pull_request.number }}/
-              echo "Copied SVG files"
+              for file in .code-analysis/outputs/*.svg; do
+                filename=$(basename "$file")
+                name="${filename%.*}"
+                extension="${filename##*.}"
+                new_filename="${name}-${SHORT_SHA}.${extension}"
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$new_filename"
+                # Also copy without hash for backward compatibility
+                cp "$file" "gh-pages/pr/${{ github.event.pull_request.number }}/$filename"
+                echo "Copied $filename as $new_filename"
+              done
             else
               echo "No SVG files found"
             fi

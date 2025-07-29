@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Generate GitHub Pages URL for an image with cache busting
+ * Generate GitHub Pages URL for an image with cache busting via filename
  */
 function generateGitHubPagesUrl(filename) {
   const owner = process.env.GITHUB_REPOSITORY_OWNER || 'emataei';
@@ -10,10 +10,14 @@ function generateGitHubPagesUrl(filename) {
   const prNumber = process.env.GITHUB_PR_NUMBER || process.env.PR_NUMBER;
   
   if (prNumber) {
-    // Add commit SHA and timestamp for strong cache busting
+    // Include commit SHA in filename for stronger cache busting
     const commitSha = process.env.GITHUB_SHA || 'unknown';
-    const timestamp = new Date().getTime();
-    return `https://${owner}.github.io/${repo}/pr/${prNumber}/${filename}?commit=${commitSha.substring(0, 8)}&t=${timestamp}`;
+    const shortSha = commitSha.substring(0, 8);
+    const baseName = filename.replace(/\.[^/.]+$/, ''); // Remove extension
+    const extension = filename.split('.').pop();
+    const cachedFilename = `${baseName}-${shortSha}.${extension}`;
+    
+    return `https://${owner}.github.io/${repo}/pr/${prNumber}/${cachedFilename}`;
   }
   return null;
 }
