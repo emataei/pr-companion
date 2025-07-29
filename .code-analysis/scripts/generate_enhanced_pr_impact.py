@@ -71,7 +71,7 @@ def analyze_pr_risk_context() -> Dict[str, Any]:
             print("Quality gate results file not found - using defaults")
         
         # Load cognitive analysis for complexity details
-        cognitive_file = Path('.code-analysis/outputs/cognitive-analysis-results.json')
+        cognitive_file = Path('.code-analysis/outputs/cognitive_analysis.json')
         print(f"Looking for cognitive analysis at: {cognitive_file.absolute()}")
         if cognitive_file.exists():
             print("Cognitive analysis found - loading...")
