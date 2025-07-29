@@ -2,60 +2,41 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Convert an image file to base64 data URL
+ * Generate GitHub Pages URL for an image with cache busting
  */
-async function convertImageToBase64(imagePath) {
-  try {
-    if (!fs.existsSync(imagePath)) {
-      return null;
-    }
-    
-    const imageBuffer = fs.readFileSync(imagePath);
-    const ext = path.extname(imagePath).toLowerCase();
-    let mimeType = 'image/png';
-    
-    if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-    else if (ext === '.gif') mimeType = 'image/gif';
-    else if (ext === '.svg') mimeType = 'image/svg+xml';
-    
-    return `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
-  } catch (error) {
-    console.log(`Could not convert image ${imagePath}:`, error.message);
-    return null;
+function generateGitHubPagesUrl(filename) {
+  const owner = process.env.GITHUB_REPOSITORY_OWNER || 'emataei';
+  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1] || 'pr-companion';
+  const prNumber = process.env.GITHUB_PR_NUMBER || process.env.PR_NUMBER;
+  
+  if (prNumber) {
+    // Add commit SHA and timestamp for strong cache busting
+    const commitSha = process.env.GITHUB_SHA || 'unknown';
+    const timestamp = new Date().getTime();
+    return `https://${owner}.github.io/${repo}/pr/${prNumber}/${filename}?commit=${commitSha.substring(0, 8)}&t=${timestamp}`;
   }
+  return null;
 }
 
 /**
- * Generate display options for an image with size-aware embedding
+ * Generate display options for an image with GitHub Pages URL only
  */
 function generateImageDisplayOptions(imagePath, title, base64Data, forceCompact = false) {
   const fileName = path.basename(imagePath);
+  const githubPagesUrl = generateGitHubPagesUrl(fileName);
   let content = `### ${title}\n\n`;
   
-  if (base64Data && !forceCompact) {
-    const sizeKB = Buffer.byteLength(base64Data.split(',')[1], 'base64') / 1024;
-    
-    // Embed images up to 100KB to ensure they show in PR comments
-    if (sizeKB < 100) {
-      content += `<div align="center">\n\n`;
-      content += `<img src="${base64Data}" alt="${title}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />\n\n`;
-      content += `</div>\n\n`;
-      content += `<details>\n<summary>📊 Image Details</summary>\n\n`;
-      content += `- **File:** \`${fileName}\`\n`;
-      content += `- **Size:** ${sizeKB.toFixed(1)} KB\n`;
-      content += `- **Format:** ${getImageFormat(fileName)}\n`;
-      content += `- **Status:** ✅ Embedded for instant viewing\n`;
-      content += `\n</details>\n\n`;
-    } else {
-      // Large image - provide compact reference
-      content += `> **Large Image Available:** \`${fileName}\` (${sizeKB.toFixed(1)} KB)\n\n`;
-      content += `Image too large for inline display. Available in workflow artifacts.\n\n`;
-    }
-  } else if (base64Data && forceCompact) {
-    // Compact mode - just reference the image
-    const sizeKB = Buffer.byteLength(base64Data.split(',')[1], 'base64') / 1024;
-    content += `> **📊 Large Image Generated:** \`${fileName}\` (${sizeKB.toFixed(1)} KB)\n\n`;
-    content += `> Image is too large for inline display but available in workflow artifacts.\n\n`;
+  if (githubPagesUrl && imagePath && fs.existsSync(imagePath)) {
+    // Use GitHub Pages URL for dynamic images
+    content += `<div align="center">\n\n`;
+    content += `<img src="${githubPagesUrl}" alt="${title}" style="max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />\n\n`;
+    content += `</div>\n\n`;
+    content += `<details>\n<summary>Image Details</summary>\n\n`;
+    content += `- **File:** \`${fileName}\`\n`;
+    content += `- **URL:** [${githubPagesUrl}](${githubPagesUrl})\n`;
+    content += `- **Format:** ${getImageFormat(fileName)}\n`;
+    content += `- **Status:** Dynamic GitHub Pages link\n`;
+    content += `\n</details>\n\n`;
   } else {
     // No image available
     content += `> **Image not generated:** \`${fileName}\`\n\n`;
@@ -86,9 +67,9 @@ function getImageFormat(fileName) {
 }
 
 /**
- * Main function to generate enhanced image report with embedded PNGs
+ * Main function to generate enhanced image report with GitHub Pages URLs
  */
-async function generateEnhancedImageReport() {
+function generateEnhancedImageReport() {
   console.log('Generating enhanced image report with PNG displays...');
   
   // Use the correct path to .code-analysis/outputs directory
@@ -110,10 +91,9 @@ async function generateEnhancedImageReport() {
   console.log('Looking for images in:', path.resolve(outputsDir));
   
   let reportContent = '## Enhanced PR Visuals\n\n';
-  reportContent += '*Real-time analytics with embedded images for instant viewing*\n\n';
+  reportContent += '*Real-time analytics with dynamic images*\n\n';
   
   let hasImages = false;
-  let totalSize = 0;
   
   // Helper function to find image in the outputs directory only
   function findImage(filename) {
@@ -128,63 +108,23 @@ async function generateEnhancedImageReport() {
   
   // Process the main images
   const allImages = images;
-  const MAX_COMMENT_SIZE = 58000; // Conservative limit for GitHub comments with base64 images
-  let currentSize = reportContent.length;
-  let forceCompact = false;
-  
-  // First pass: calculate total content size to determine if we need compact mode
-  let estimatedSize = currentSize;
-  const imageData = [];
+  hasImages = false;
   
   for (const [filename, title] of Object.entries(allImages)) {
     const imagePath = findImage(filename);
-    const base64Data = imagePath ? await convertImageToBase64(imagePath) : null;
-    imageData.push({ filename, title, imagePath, base64Data });
     
-    if (base64Data) {
-      // Estimate content size (base64 + markup)
-      estimatedSize += base64Data.length + 500; // markup overhead
-    }
-  }
-  
-  // Switch to compact mode if estimated size is too large
-  if (estimatedSize > MAX_COMMENT_SIZE) {
-    forceCompact = true;
-    console.log(`⚠️  Large content detected (${(estimatedSize/1024).toFixed(1)}KB), using compact mode`);
-  }
-  
-  // Second pass: generate content with appropriate mode
-  for (const { filename, title, imagePath, base64Data } of imageData) {
-    if (base64Data) {
+    if (imagePath) {
       hasImages = true;
-      const sizeKB = Buffer.byteLength(base64Data.split(',')[1], 'base64') / 1024;
-      totalSize += sizeKB;
-      
-      const imageContent = generateImageDisplayOptions(imagePath, title, base64Data, forceCompact);
-      
-      // Check if adding this content would exceed the limit
-      if (currentSize + imageContent.length > MAX_COMMENT_SIZE) {
-        forceCompact = true;
-        console.log(`⚠️  Switching to compact mode due to size limit`);
-        // Regenerate in compact mode
-        const compactContent = generateImageDisplayOptions(imagePath, title, base64Data, true);
-        reportContent += compactContent;
-        currentSize += compactContent.length;
-      } else {
-        reportContent += imageContent;
-        currentSize += imageContent.length;
-      }
-      
-      console.log(`✓ ${forceCompact ? 'Referenced' : 'Embedded'} ${filename} (${sizeKB.toFixed(1)} KB)`);
+      const imageContent = generateImageDisplayOptions(imagePath, title, null, false);
+      reportContent += imageContent;
+      console.log(`Found and processed ${filename}`);
     } else {
-      const noImageContent = generateImageDisplayOptions(filename, title, null, forceCompact);
+      const noImageContent = generateImageDisplayOptions(filename, title, null, false);
       reportContent += noImageContent;
-      currentSize += noImageContent.length;
-      console.log(`✗ Image not found: ${filename}`);
+      console.log(`Image not found: ${filename}`);
     }
     
     reportContent += '---\n\n';
-    currentSize += 7; // "---\n\n"
   }
   
   // Add message if no images were generated
@@ -204,8 +144,7 @@ async function generateEnhancedImageReport() {
     hasImages,
     totalImages: Object.keys(allImages).length,
     reportPath,
-    reportContent,
-    totalSizeKB: totalSize
+    reportContent
   };
 }
 
@@ -234,13 +173,12 @@ function getFileType(fileName) {
 }
 
 // Main execution
-async function main() {
+function main() {
   try {
-    const result = await generateEnhancedImageReport();
+    const result = generateEnhancedImageReport();
     console.log('\nEnhanced image report generation complete!');
     console.log(`Report: ${result.reportPath}`);
-    console.log(`Images: ${result.hasImages ? result.totalImages + ' embedded' : 'None found'}`);
-    console.log(`Total size: ${result.totalSizeKB.toFixed(1)} KB`);
+    console.log(`Images: ${result.hasImages ? result.totalImages + ' linked' : 'None found'}`);
     
     // Print a preview of the report content
     console.log('\n' + '='.repeat(80));
@@ -261,6 +199,5 @@ if (require.main === module) {
 
 module.exports = { 
   generateEnhancedImageReport,
-  convertImageToBase64,
   generateImageDisplayOptions
 };

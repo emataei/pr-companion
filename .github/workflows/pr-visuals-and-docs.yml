@@ -108,8 +108,17 @@ jobs:
           echo "Running story arc script..."
           python .code-analysis/scripts/generate_story_arc.py
       - name: Generate enhanced visuals report
+        env:
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
-          echo "Generating enhanced visuals report with embedded images..."
+          echo "Generating enhanced visuals report with dynamic GitHub Pages URLs..."
+          echo "Repository: $GITHUB_REPOSITORY"
+          echo "PR Number: $GITHUB_PR_NUMBER"
+          echo "Commit SHA: $GITHUB_SHA"
           if [ -f ".code-analysis/scripts/generate-embedded-visuals.js" ]; then
             node .code-analysis/scripts/generate-embedded-visuals.js
             # Validate report size
@@ -402,6 +411,12 @@ jobs:
           script: |
             const script = require('./.code-analysis/scripts/cleanup-old-visual-comments.js');
             return await script({ github, context });
+      - name: Wait for GitHub Pages deployment
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "Waiting 30 seconds for GitHub Pages to propagate..."
+          sleep 30
+
       - name: Comment PR with GitHub Pages hosted visuals
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
