@@ -1,4 +1,8 @@
 name: Unified PR Analysis
+# This is the ACTIVE workflow that replaces the old separate workflows:
+# - code-quality-analysis.yml (disabled)
+# - ai-cognitive-analysis.yml (disabled) 
+# - pr-visuals-and-docs.yml (disabled)
 on:
   pull_request:
     types: [opened, synchronize, reopened]

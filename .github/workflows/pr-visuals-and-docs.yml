@@ -1,8 +1,11 @@
-name: PR Visuals and Documentation
+name: PR Visuals and Documentation (DISABLED - Using Unified Workflow)
+# DISABLED: This workflow has been replaced by unified-pr-analysis.yml
 on:
-  workflow_run:
-    workflows: ["Code Quality Analysis"]
-    types: [completed]
+  workflow_dispatch:  # Manual trigger only - this workflow is disabled
+# Old triggers (disabled):
+#   workflow_run:
+#     workflows: ["Code Quality Analysis"]
+#     types: [completed]
 permissions:
   contents: write  # Needed for GitHub Pages deployment
   pull-requests: write

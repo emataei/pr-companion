@@ -1,9 +1,11 @@
-name: AI Cognitive Analysis
-
+name: AI Cognitive Analysis (DISABLED - Using Unified Workflow)
+# DISABLED: This workflow has been replaced by unified-pr-analysis.yml
 on:
-  workflow_run:
-    workflows: ["Code Quality Analysis"]
-    types: [completed]
+  workflow_dispatch:  # Manual trigger only - this workflow is disabled
+# Old triggers (disabled):
+#   workflow_run:
+#     workflows: ["Code Quality Analysis"]
+#     types: [completed]
 
 permissions:
   contents: read
