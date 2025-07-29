@@ -336,6 +336,20 @@ jobs:
             const script = require('./.code-analysis/scripts/semantic-commit-pr-description.js');
             return await script({ github, context });
 
+      - name: Check AI analysis files before upload
+        run: |
+          echo "Checking for AI analysis output files..."
+          echo "Root directory files:"
+          ls -la *.json 2>/dev/null || echo "No JSON files in root"
+          echo "Output directory files:"
+          ls -la .code-analysis/outputs/*.json 2>/dev/null || echo "No JSON files in outputs"
+          echo "Specific files we're looking for:"
+          [ -f "ai-pre-review-results.json" ] && echo "✓ ai-pre-review-results.json exists" || echo "✗ ai-pre-review-results.json missing"
+          [ -f ".code-analysis/outputs/cognitive_analysis.json" ] && echo "✓ cognitive_analysis.json exists" || echo "✗ cognitive_analysis.json missing"
+          [ -f "intent-classification-results.json" ] && echo "✓ intent-classification-results.json exists" || echo "✗ intent-classification-results.json missing"
+          [ -f "impact-prediction-results.json" ] && echo "✓ impact-prediction-results.json exists" || echo "✗ impact-prediction-results.json missing"
+          [ -f "semantic-commit-analysis.json" ] && echo "✓ semantic-commit-analysis.json exists" || echo "✗ semantic-commit-analysis.json missing"
+
       - name: Upload AI Analysis Results
         uses: actions/upload-artifact@v4
         with:
@@ -343,6 +357,7 @@ jobs:
           path: |
             ai-pre-review-results.json
             .code-analysis/outputs/cognitive_analysis.json
+            .code-analysis/outputs/cognitive-analysis-results.json
             intent-classification-results.json
             impact-prediction-results.json
             semantic-commit-analysis.json
