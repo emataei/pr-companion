@@ -24,7 +24,7 @@ function generateImageMarkdown(imageName, altText, title) {
 }
 
 function generateEnhancedImageReport() {
-  const outputDir = path.join('..', 'outputs');
+  const outputDir = path.join('.code-analysis', 'outputs');
   const images = [
     {
       filename: 'development_flow.png',
