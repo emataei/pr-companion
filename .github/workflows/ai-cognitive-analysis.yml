@@ -16,27 +16,20 @@ jobs:
   ai-cognitive-analysis:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
+    needs: technical-analysis  # Wait for code quality analysis to complete
     
     steps:
-      - name: Wait for code quality analysis
-        uses: fountainhead/action-wait-for-check@v1.2.0
-        id: wait-for-quality
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: technical-analysis
-          ref: ${{ github.event.pull_request.head.sha }}
-          timeoutSeconds: 600 # 10 minutes max wait
-          
+          fetch-depth: 0
+
       - name: Download quality analysis results
         uses: actions/download-artifact@v4
         with:
           name: code-quality-analysis-results
           path: ./quality-results/
         continue-on-error: true
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v4
