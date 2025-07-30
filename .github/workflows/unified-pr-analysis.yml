@@ -334,7 +334,17 @@ jobs:
         continue-on-error: true
 
       # POST AI ANALYSIS COMMENTS IN PRIORITY ORDER
-      - name: Post AI Pre-Review Comment (1st - Priority)
+      - name: Create Unified Analysis Comment (1st - Overview)
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const script = require('./.code-analysis/scripts/unified-analysis-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Post AI Pre-Review Comment (2nd - Detailed Analysis)
         if: always()
         uses: actions/github-script@v7
         env:
@@ -344,7 +354,7 @@ jobs:
             const script = require('./.code-analysis/scripts/ai-pre-review-pr-comment.js');
             return await script({ github, context });
 
-      - name: Post Cognitive Complexity Comment (2nd)
+      - name: Post Cognitive Complexity Comment (3rd - Complexity Details)
         if: always()
         uses: actions/github-script@v7
         env:
@@ -760,13 +770,4 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
-            return await script({ github, context });
-
-      - name: Create Unified Analysis Comment
-        if: always()
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const script = require('./.code-analysis/scripts/unified-analysis-pr-comment.js');
             return await script({ github, context });

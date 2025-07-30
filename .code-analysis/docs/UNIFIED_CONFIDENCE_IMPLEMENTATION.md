@@ -21,7 +21,7 @@
 
 #### 3. **Consolidated Analysis** ✅
 - **All-in-One Comment**: Combines cognitive, risk, quality, and impact analysis
-- **No Conflicts**: Individual comments disabled when unified system is active
+- **No Conflicts**: Removed conflicting confidence displays from individual comments
 - **Refresh on Push**: Updates automatically with each commit
 - **Clean Design**: Professional presentation without emoji overload
 
@@ -53,7 +53,7 @@
 - ✅ `unified-analysis-pr-comment.js` - Main unified comment system
 - ✅ `COGNITIVE_REVIEW_SYSTEM.md` - Updated with confidence framework
 - ✅ `unified-pr-analysis.yml` - Workflow integration
-- ✅ Individual comment scripts - Skip when unified enabled
+- ✅ Individual comment scripts - Removed conflicting confidence displays
 - ✅ `test-unified-confidence.js` - Validation and testing
 
 #### Key Features:
@@ -77,7 +77,7 @@
 #### System Reliability
 - ✅ **Consistent Scoring**: All components use same methodology
 - ✅ **Weighted Calculation**: Risk assessment gets higher weight (40%)
-- ✅ **No Conflicts**: Automated prevention of duplicate comments
+- ✅ **No Conflicts**: Removed conflicting confidence displays from all comments
 
 ### 🚀 Next Steps (Optional Enhancements)
 
