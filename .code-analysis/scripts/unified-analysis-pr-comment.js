@@ -120,7 +120,7 @@ function getRiskIndicator(riskLevel) {
 
 function buildHeaderSection(confidenceLevel, overallConfidence, tierInfo) {
   const progressBar = createProgressBar(overallConfidence);
-  let section = `## 🤖 AI Analysis Summary\n\n`;
+  let section = `## AI Analysis Summary\n\n`;
   section += `<table><tr><td>\n\n`;
   section += `**${confidenceLevel.indicator} ${confidenceLevel.level} CONFIDENCE** (${overallConfidence}%)\n`;
   section += `${progressBar}\n\n`;
@@ -141,7 +141,7 @@ function getTierEmoji(tier) {
 }
 
 function buildConfidenceBreakdown(confidenceComponents) {
-  let section = `### 📊 Confidence Breakdown\n\n`;
+  let section = `### Confidence Breakdown\n\n`;
   section += `<table>\n`;
   
   for (const [component, score] of Object.entries(confidenceComponents)) {
@@ -163,7 +163,7 @@ function createMiniProgressBar(percentage) {
 function buildChangeClassificationSection(intentClassification) {
   if (!intentClassification.primary_intent) return '';
   
-  let section = `### 🔄 Change Type\n\n`;
+  let section = `### Change Type\n\n`;
   const intent = intentClassification.primary_intent.toUpperCase();
   const confidence = Math.round(intentClassification.confidence * 100);
   
@@ -200,7 +200,7 @@ function getChangeTypeEmoji(type) {
 function buildRiskAssessmentSection(aiPreReview) {
   if (!aiPreReview.risk_level) return '';
   
-  let section = `### ⚠️ Risk Assessment\n\n`;
+  let section = `### Risk Assessment\n\n`;
   const riskLevel = aiPreReview.risk_level;
   const riskIndicator = getRiskIndicator(riskLevel);
   
@@ -220,7 +220,7 @@ function buildRiskAssessmentSection(aiPreReview) {
 function buildQualityGateSection(qualityGate) {
   if (qualityGate.score === undefined) return '';
   
-  let section = `### 🚦 Quality Gate\n\n`;
+  let section = `### Quality Gate\n\n`;
   const qualityStatus = qualityGate.passed ? '✅ PASS' : '❌ FAIL';
   const qualityScore = qualityGate.score || 0;
   
@@ -240,7 +240,7 @@ function buildQualityGateSection(qualityGate) {
 function buildImpactAnalysisSection(impactPrediction) {
   if (!impactPrediction.impacts?.length) return '';
   
-  let section = `### 💥 Impact Analysis\n\n`;
+  let section = `### Impact Analysis\n\n`;
   const criticalImpacts = impactPrediction.impacts.filter(i => i.severity === 'critical');
   const highImpacts = impactPrediction.impacts.filter(i => i.severity === 'high');
   
@@ -265,7 +265,7 @@ function buildImpactAnalysisSection(impactPrediction) {
 }
 
 function buildRecommendedActionsSection(overallConfidence, tierInfo) {
-  let section = `### 🎯 Next Actions\n\n`;
+  let section = `### Next Actions\n\n`;
   
   section += `<table><tr><td>\n\n`;
   
@@ -289,11 +289,11 @@ function buildRecommendedActionsSection(overallConfidence, tierInfo) {
   
   // Tier-specific guidance
   if (tierInfo.tier === 0) {
-    section += `**🚀 Auto-merge eligible** - Checks sufficient\n`;
+    section += `**Auto-merge eligible** - Checks sufficient\n`;
   } else if (tierInfo.tier === 1) {
-    section += `**👤 Standard review** - One approval needed\n`;
+    section += `**Standard review** - One approval needed\n`;
   } else {
-    section += `**👥 Expert review** - Multiple experts needed\n`;
+    section += `**Expert review** - Multiple experts needed\n`;
   }
   
   section += `\n</td></tr></table>\n\n`;
@@ -330,7 +330,7 @@ function buildUnifiedAnalysisComment(allResults) {
   comment += buildRecommendedActionsSection(overallConfidence, tierInfo);
   
   comment += `\n---\n`;
-  comment += `*🕐 ${new Date().toISOString().split('T')[0]} • Complexity: ${tierInfo.score}/100 • Confidence: ${overallConfidence}%*\n`;
+  comment += `*Updated: ${new Date().toISOString().split('T')[0]} • Complexity: ${tierInfo.score}/100 • Confidence: ${overallConfidence}%*\n`;
   
   return comment;
 }
