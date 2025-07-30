@@ -113,19 +113,6 @@ jobs:
           AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
         continue-on-error: true
 
-      - name: Generate Dependency Graph Analysis
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
-        run: |
-          python .code-analysis/scripts/dependency_graph_generator.py \
-            --repo . \
-            --before ${{ github.event.pull_request.base.sha }} \
-            --after ${{ github.event.pull_request.head.sha }} \
-            --pr-output
-        continue-on-error: true
-
       - name: Generate Smart Recommendations
         run: python .code-analysis/scripts/generate_smart_recommendations.py
         continue-on-error: true
@@ -146,7 +133,7 @@ jobs:
       - name: Check for generated artifacts
         id: check-artifacts
         run: |
-          if ls dependency_graph_pr.png *.html *.txt 2>/dev/null; then
+          if ls *.html *.txt 2>/dev/null; then
             echo "artifacts-exist=true" >> $GITHUB_OUTPUT
           else
             echo "artifacts-exist=false" >> $GITHUB_OUTPUT
@@ -165,7 +152,6 @@ jobs:
         with:
           name: technical-analysis-results
           path: |
-            dependency_graph_pr.png
             *.html
             *.txt
         if: always() && steps.check-artifacts.outputs.artifacts-exist == 'true'
@@ -492,15 +478,6 @@ jobs:
           echo "Diff stats generated:"
           head -10 .code-analysis/outputs/diff_stats.txt
 
-      - name: Generate dependency graphs
-        run: python .code-analysis/scripts/generate_dependency_graphs.py
-        env:
-          GITHUB_BASE_REF: ${{ github.base_ref }}
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-          PROJECT_DIR: ${{ steps.detect-structure.outputs.project_dir }}
-          SOURCE_DIRS: ${{ steps.detect-structure.outputs.source_dirs }}
-          PROJECT_TYPE: ${{ steps.detect-structure.outputs.project_type }}
-
       - name: Generate enhanced PR impact analysis
         run: |
           echo "Generating enhanced PR impact analysis data..."
@@ -510,11 +487,6 @@ jobs:
         run: |
           echo "Running development flow script..."
           python .code-analysis/scripts/generate_development_flow.py
-
-      - name: Generate story arc animation
-        run: |
-          echo "Running story arc script..."
-          python .code-analysis/scripts/generate_story_arc.py
 
       - name: Generate enhanced visuals report
         env:
@@ -646,14 +618,6 @@ jobs:
                   <p>Shows risk score, review time estimate, file change heatmap, and development intent.</p>   
                   <img src="development_flow.png?v=${{ github.run_number }}" alt="PR Impact Grid" />
               </div>
-              <div class="visual">
-                  <h2>Story Arc</h2>
-                  <img src="story_arc.png?v=${{ github.run_number }}" alt="Story Arc" />
-              </div>
-              <div class="visual">
-                  <h2>PR Dependencies</h2>
-                  <img src="dependency_graph_pr.png?v=${{ github.run_number }}" alt="PR Dependency Graph" />
-              </div>
               <div class="timestamp">Last updated: $(date) - Run #${{ github.run_number }}</div>
           </body>
           </html>
@@ -680,8 +644,6 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
           echo "base_url=${BASE_URL}" >> $GITHUB_OUTPUT
           echo "development_flow_url=${BASE_URL}/pr/${PR_NUM}/development_flow.png" >> $GITHUB_OUTPUT
-          echo "story_arc_url=${BASE_URL}/pr/${PR_NUM}/story_arc.png" >> $GITHUB_OUTPUT
-          echo "dependency_pr_url=${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png" >> $GITHUB_OUTPUT
           echo "pr_index_url=${BASE_URL}/pr/${PR_NUM}/index.html" >> $GITHUB_OUTPUT
           # Store URLs in a file for the comment scripts
           mkdir -p .code-analysis/outputs
@@ -693,8 +655,6 @@ jobs:
             "pr_number": "${PR_NUM}",
             "urls": {
               "development_flow": "${BASE_URL}/pr/${PR_NUM}/development_flow.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
-              "story_arc": "${BASE_URL}/pr/${PR_NUM}/story_arc.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
-              "dependency_pr": "${BASE_URL}/pr/${PR_NUM}/dependency_graph_pr.png?v=${TIMESTAMP}&r=${RANDOM_ID}",
               "index": "${BASE_URL}/pr/${PR_NUM}/index.html?v=${TIMESTAMP}&r=${RANDOM_ID}"
             }
           }
@@ -708,9 +668,7 @@ jobs:
         with:
           name: pr-visuals-and-docs
           path: |
-            .code-analysis/outputs/dependency_graph_pr.png
             .code-analysis/outputs/development_flow.png
-            .code-analysis/outputs/story_arc.png
             .code-analysis/outputs/enhanced_image_report.md
             .code-analysis/outputs/documentation_suggestions.md
             .code-analysis/outputs/diff_stats.txt
