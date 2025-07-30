@@ -119,136 +119,184 @@ function getRiskIndicator(riskLevel) {
 }
 
 function buildHeaderSection(confidenceLevel, overallConfidence, tierInfo) {
-  let section = `## Cognitive Review Analysis\n\n`;
-  section += `**Overall Confidence:** ${confidenceLevel.level} (${overallConfidence}%) ${confidenceLevel.indicator}\n`;
-  section += `*${confidenceLevel.description}*\n\n`;
-  section += `**Review Tier:** ${tierInfo.description} | **Cognitive Score:** ${tierInfo.score}/100\n\n`;
+  const progressBar = createProgressBar(overallConfidence);
+  let section = `## 🤖 AI Analysis Summary\n\n`;
+  section += `<table><tr><td>\n\n`;
+  section += `**${confidenceLevel.indicator} ${confidenceLevel.level} CONFIDENCE** (${overallConfidence}%)\n`;
+  section += `${progressBar}\n\n`;
+  section += `**${getTierEmoji(tierInfo.tier)} ${tierInfo.description}** • Complexity: ${tierInfo.score}/100\n\n`;
+  section += `</td></tr></table>\n\n`;
   return section;
 }
 
+function createProgressBar(percentage) {
+  const filled = Math.floor(percentage / 10);
+  const empty = 10 - filled;
+  return '▓'.repeat(filled) + '░'.repeat(empty);
+}
+
+function getTierEmoji(tier) {
+  const emojis = { 0: '🟢', 1: '🟡', 2: '🔴' };
+  return emojis[tier] || '🟡';
+}
+
 function buildConfidenceBreakdown(confidenceComponents) {
-  let section = `### Analysis Confidence Breakdown\n\n`;
-  section += `| Component | Score | Level | Status |\n`;
-  section += `|-----------|-------|-------|--------|\n`;
+  let section = `### 📊 Confidence Breakdown\n\n`;
+  section += `<table>\n`;
   
   for (const [component, score] of Object.entries(confidenceComponents)) {
-    const level = getConfidenceLevel(score);
     const componentName = component.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
     const status = getStatusIndicator(score);
-    section += `| ${componentName} | ${score}% | ${level.level} | ${status} |\n`;
+    const bar = createMiniProgressBar(score);
+    section += `<tr><td><strong>${componentName}</strong></td><td>${bar}</td><td><strong>${score}%</strong></td><td>${status}</td></tr>\n`;
   }
-  section += `\n`;
+  section += `</table>\n\n`;
   return section;
+}
+
+function createMiniProgressBar(percentage) {
+  const filled = Math.floor(percentage / 20);
+  const empty = 5 - filled;
+  return '■'.repeat(filled) + '□'.repeat(empty);
 }
 
 function buildChangeClassificationSection(intentClassification) {
   if (!intentClassification.primary_intent) return '';
   
-  let section = '';
+  let section = `### 🔄 Change Type\n\n`;
   const intent = intentClassification.primary_intent.toUpperCase();
   const confidence = Math.round(intentClassification.confidence * 100);
-  section += `**Change Type:** ${intent} (${confidence}% confidence)\n`;
+  
+  section += `<table><tr><td>\n\n`;
+  section += `**${getChangeTypeEmoji(intent)} ${intent}** (${confidence}% confidence)\n\n`;
   
   if (intentClassification.secondary_intents?.length > 0) {
     const secondaryIntents = intentClassification.secondary_intents
       .filter(([intent, conf]) => conf > 0.3)
       .slice(0, 2)
       .map(([intent, conf]) => `${intent.toUpperCase()} (${Math.round(conf * 100)}%)`)
-      .join(', ');
+      .join(' • ');
     if (secondaryIntents) {
-      section += `**Secondary Types:** ${secondaryIntents}\n`;
+      section += `*Also: ${secondaryIntents}*\n\n`;
     }
   }
-  section += `\n`;
+  section += `</td></tr></table>\n\n`;
   return section;
+}
+
+function getChangeTypeEmoji(type) {
+  const emojis = {
+    'FEATURE': '✨',
+    'BUGFIX': '🐛',
+    'REFACTOR': '♻️',
+    'DOCUMENTATION': '📝',
+    'TEST': '🧪',
+    'CHORE': '🔧',
+    'STYLE': '💄'
+  };
+  return emojis[type] || '🔄';
 }
 
 function buildRiskAssessmentSection(aiPreReview) {
   if (!aiPreReview.risk_level) return '';
   
-  let section = '';
+  let section = `### ⚠️ Risk Assessment\n\n`;
   const riskLevel = aiPreReview.risk_level;
   const riskIndicator = getRiskIndicator(riskLevel);
-  section += `**Risk Level:** ${riskLevel} ${riskIndicator}\n`;
+  
+  section += `<table><tr><td>\n\n`;
+  section += `**${riskIndicator} ${riskLevel} RISK**\n\n`;
   
   if (aiPreReview.risk_factors?.length > 0) {
-    section += `**Risk Factors:**\n`;
-    aiPreReview.risk_factors.slice(0, 3).forEach(factor => {
-      section += `- ${factor}\n`;
+    section += `**Key Concerns:**\n`;
+    aiPreReview.risk_factors.slice(0, 2).forEach(factor => {
+      section += `• ${factor}\n`;
     });
   }
-  section += `\n`;
+  section += `\n</td></tr></table>\n\n`;
   return section;
 }
 
 function buildQualityGateSection(qualityGate) {
   if (qualityGate.score === undefined) return '';
   
-  let section = '';
-  const qualityStatus = qualityGate.passed ? '✓ PASS' : '❌ FAIL';
+  let section = `### 🚦 Quality Gate\n\n`;
+  const qualityStatus = qualityGate.passed ? '✅ PASS' : '❌ FAIL';
   const qualityScore = qualityGate.score || 0;
-  section += `**Quality Gate:** ${qualityStatus} (${qualityScore}/100)\n`;
+  
+  section += `<table><tr><td>\n\n`;
+  section += `**${qualityStatus}** (${qualityScore}/100)\n\n`;
   
   if (qualityGate.blocking_issues?.length > 0) {
-    section += `**Blocking Issues:**\n`;
-    qualityGate.blocking_issues.slice(0, 3).forEach(issue => {
-      section += `- ${issue.type}: ${issue.message}\n`;
+    section += `**Issues Found:**\n`;
+    qualityGate.blocking_issues.slice(0, 2).forEach(issue => {
+      section += `• ${issue.type}: ${issue.message}\n`;
     });
   }
-  section += `\n`;
+  section += `\n</td></tr></table>\n\n`;
   return section;
 }
 
 function buildImpactAnalysisSection(impactPrediction) {
   if (!impactPrediction.impacts?.length) return '';
   
-  let section = `**Impact Analysis:**\n`;
+  let section = `### 💥 Impact Analysis\n\n`;
   const criticalImpacts = impactPrediction.impacts.filter(i => i.severity === 'critical');
   const highImpacts = impactPrediction.impacts.filter(i => i.severity === 'high');
   
+  section += `<table><tr><td>\n\n`;
+  
   if (criticalImpacts.length > 0) {
-    section += `**Critical Impacts:** ${criticalImpacts.length}\n`;
-    criticalImpacts.slice(0, 2).forEach(impact => {
-      section += `- ${impact.description}\n`;
+    section += `**🔴 Critical:** ${criticalImpacts.length} impacts\n`;
+    criticalImpacts.slice(0, 1).forEach(impact => {
+      section += `• ${impact.description}\n`;
     });
+    section += `\n`;
   }
   
   if (highImpacts.length > 0) {
-    section += `**High Impacts:** ${highImpacts.length}\n`;
-    highImpacts.slice(0, 2).forEach(impact => {
-      section += `- ${impact.description}\n`;
+    section += `**🟡 High:** ${highImpacts.length} impacts\n`;
+    highImpacts.slice(0, 1).forEach(impact => {
+      section += `• ${impact.description}\n`;
     });
   }
-  section += `\n`;
+  section += `\n</td></tr></table>\n\n`;
   return section;
 }
 
 function buildRecommendedActionsSection(overallConfidence, tierInfo) {
-  let section = `### Recommended Review Actions\n\n`;
+  let section = `### 🎯 Next Actions\n\n`;
+  
+  section += `<table><tr><td>\n\n`;
   
   if (overallConfidence >= 80) {
-    section += `✅ **High Confidence Analysis** - Focus review on AI-highlighted areas\n`;
-    section += `✅ Use AI insights to guide review priorities\n`;
+    section += `**🟢 High Confidence**\n`;
+    section += `• Focus review on AI-highlighted areas\n`;
+    section += `• Use AI insights to guide priorities\n\n`;
   } else if (overallConfidence >= 60) {
-    section += `⚠️ **Medium Confidence Analysis** - Use AI as starting point, verify conclusions\n`;
-    section += `⚠️ Cross-reference AI findings with manual analysis\n`;
+    section += `**🟡 Medium Confidence**\n`;
+    section += `• Use AI as starting point\n`;
+    section += `• Verify AI conclusions manually\n\n`;
   } else if (overallConfidence >= 40) {
-    section += `🔍 **Low Confidence Analysis** - AI classification for context only\n`;
-    section += `🔍 Conduct thorough manual review beyond AI suggestions\n`;
+    section += `**🟠 Low Confidence**\n`;
+    section += `• AI provides basic context only\n`;
+    section += `• Conduct thorough manual review\n\n`;
   } else {
-    section += `🚨 **Very Low Confidence** - Rely primarily on manual review\n`;
-    section += `🚨 AI analysis may not be reliable for this change\n`;
+    section += `**� Very Low Confidence**\n`;
+    section += `• Rely primarily on manual review\n`;
+    section += `• AI analysis may be unreliable\n\n`;
   }
   
   // Tier-specific guidance
   if (tierInfo.tier === 0) {
-    section += `🚀 **Auto-merge eligible** - Automated checks sufficient\n`;
+    section += `**🚀 Auto-merge eligible** - Checks sufficient\n`;
   } else if (tierInfo.tier === 1) {
-    section += `👤 **Standard review required** - One team member approval needed\n`;
+    section += `**👤 Standard review** - One approval needed\n`;
   } else {
-    section += `👥 **Expert review required** - Multiple domain experts needed\n`;
+    section += `**👥 Expert review** - Multiple experts needed\n`;
   }
   
+  section += `\n</td></tr></table>\n\n`;
   return section;
 }
 
@@ -282,7 +330,7 @@ function buildUnifiedAnalysisComment(allResults) {
   comment += buildRecommendedActionsSection(overallConfidence, tierInfo);
   
   comment += `\n---\n`;
-  comment += `*Updated: ${new Date().toISOString().split('T')[0]} | Cognitive Score: ${tierInfo.score}/100 | Overall Confidence: ${overallConfidence}%*\n`;
+  comment += `*🕐 ${new Date().toISOString().split('T')[0]} • Complexity: ${tierInfo.score}/100 • Confidence: ${overallConfidence}%*\n`;
   
   return comment;
 }
