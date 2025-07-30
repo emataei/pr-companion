@@ -363,7 +363,7 @@ async function main({ github, context } = {}) {
       context,
       prNumber,
       comment,
-      'Cognitive Review Analysis',
+      'AI Analysis Summary',
       `unified-analysis-${context.payload?.pull_request?.head?.sha || 'unknown'}`
     );
   } else {
@@ -384,7 +384,7 @@ async function main({ github, context } = {}) {
       ghContext,
       prNumber,
       comment,
-      'Cognitive Review Analysis',
+      'AI Analysis Summary',
       `unified-analysis-${ghContext.payload?.pull_request?.head?.sha || 'unknown'}`
     );
   }

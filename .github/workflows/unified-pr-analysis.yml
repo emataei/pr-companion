@@ -320,7 +320,7 @@ jobs:
         continue-on-error: true
 
       # POST AI ANALYSIS COMMENTS IN PRIORITY ORDER
-      - name: Create Unified Analysis Comment (1st - Overview)
+      - name: Create AI Analysis Summary Comment (1st - Overview)
         if: always()
         uses: actions/github-script@v7
         env:
