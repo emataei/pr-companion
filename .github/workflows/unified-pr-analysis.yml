@@ -761,3 +761,12 @@ jobs:
           script: |
             const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
             return await script({ github, context });
+
+      - name: Create Unified Analysis Comment
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/unified-analysis-pr-comment.js');
+            return await script({ github, context });
