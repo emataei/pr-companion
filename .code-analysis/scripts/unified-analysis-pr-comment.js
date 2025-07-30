@@ -302,7 +302,7 @@ async function main({ github, context } = {}) {
   // Handle both GitHub Actions script and direct CLI usage
   if (github && context) {
     // GitHub Actions script format
-    const { createOrUpdateComment } = require('./utils/github-comment-utils');
+    const { createOrUpdateComment } = require('./pr-comment-utils');
     const prNumber = context.payload?.pull_request?.number;
     
     if (!prNumber) {
@@ -321,7 +321,7 @@ async function main({ github, context } = {}) {
   } else {
     // Direct CLI usage
     const { github: ghActions, context: ghContext } = require('@actions/github');
-    const { createOrUpdateComment } = require('./utils/github-comment-utils');
+    const { createOrUpdateComment } = require('./pr-comment-utils');
     const prNumber = ghContext.payload?.pull_request?.number || 
                      process.env.PR_NUMBER || 
                      process.argv[2];
