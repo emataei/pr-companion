@@ -59,7 +59,7 @@ function getConfidenceLevel(score) {
 }
 
 function calculateOverallConfidence(components) {
-  // Weighted average of all confidence components
+  // Weighted average of all confidence components - only use real data
   const weights = {
     changeClassification: 0.3,
     riskAssessment: 0.4,
@@ -70,7 +70,7 @@ function calculateOverallConfidence(components) {
   let totalWeight = 0;
   
   for (const [component, weight] of Object.entries(weights)) {
-    if (components[component] !== undefined) {
+    if (components[component] !== null && components[component] !== undefined) {
       totalScore += components[component] * weight;
       totalWeight += weight;
     }
@@ -80,10 +80,10 @@ function calculateOverallConfidence(components) {
 }
 
 function getTierInfo(cognitiveResults) {
-  if (!cognitiveResults) return { tier: 1, score: 50, description: 'Standard Review' };
+  if (!cognitiveResults || !cognitiveResults.total_score) return null;
   
-  const score = cognitiveResults.total_score || 50;
-  const tier = cognitiveResults.tier || 1;
+  const score = cognitiveResults.total_score;
+  const tier = cognitiveResults.tier;
   
   const tierDescriptions = {
     0: 'Auto-Merge Eligible',
@@ -99,7 +99,9 @@ function getTierInfo(cognitiveResults) {
 }
 
 function getRiskAssessmentScore(aiPreReview) {
-  const confidence = aiPreReview.confidence_metrics?.analysis_confidence;
+  if (!aiPreReview || !aiPreReview.confidence_metrics?.analysis_confidence) return null;
+  
+  const confidence = aiPreReview.confidence_metrics.analysis_confidence;
   if (confidence === 'HIGH') return 85;
   if (confidence === 'MEDIUM') return 70;
   if (confidence === 'LOW') return 45;
@@ -119,6 +121,8 @@ function getRiskIndicator(riskLevel) {
 }
 
 function buildHeaderSection(confidenceLevel, overallConfidence, tierInfo) {
+  if (!tierInfo) return ''; // Don't show header if no cognitive data
+  
   const progressBar = createProgressBar(overallConfidence);
   let section = `## AI Analysis Summary\n\n`;
   section += `<table><tr><td>\n\n`;
@@ -141,10 +145,14 @@ function getTierEmoji(tier) {
 }
 
 function buildConfidenceBreakdown(confidenceComponents) {
+  // Only show if we have real confidence data
+  const validComponents = Object.entries(confidenceComponents).filter(([key, value]) => value !== null);
+  if (validComponents.length === 0) return '';
+  
   let section = `### Confidence Breakdown\n\n`;
   section += `<table>\n`;
   
-  for (const [component, score] of Object.entries(confidenceComponents)) {
+  for (const [component, score] of validComponents) {
     const componentName = component.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
     const status = getStatusIndicator(score);
     const bar = createMiniProgressBar(score);
@@ -265,6 +273,8 @@ function buildImpactAnalysisSection(impactPrediction) {
 }
 
 function buildRecommendedActionsSection(overallConfidence, tierInfo) {
+  if (!tierInfo || overallConfidence === 0) return ''; // Don't show if no real data
+  
   let section = `### Next Actions\n\n`;
   
   section += `<table><tr><td>\n\n`;
@@ -309,18 +319,29 @@ function buildUnifiedAnalysisComment(allResults) {
     impactPrediction = {}
   } = allResults;
   
-  // Calculate confidence components
+  // Calculate confidence components - only use real data, no fallbacks
   const confidenceComponents = {
-    changeClassification: intentClassification.confidence ? Math.round(intentClassification.confidence * 100) : 30,
+    changeClassification: intentClassification.confidence ? Math.round(intentClassification.confidence * 100) : null,
     riskAssessment: getRiskAssessmentScore(aiPreReview),
-    impactAnalysis: impactPrediction.overall_risk_score ? Math.round((1 - impactPrediction.overall_risk_score) * 100) : 40
+    impactAnalysis: impactPrediction.overall_risk_score ? Math.round((1 - impactPrediction.overall_risk_score) * 100) : null
   };
   
   const overallConfidence = calculateOverallConfidence(confidenceComponents);
   const confidenceLevel = getConfidenceLevel(overallConfidence);
   const tierInfo = getTierInfo(cognitive);
   
-  // Build comment sections
+  // Only build comment if we have some real data
+  const hasRealData = tierInfo || 
+                     intentClassification.primary_intent || 
+                     aiPreReview.risk_level || 
+                     (qualityGate.score !== undefined) || 
+                     (impactPrediction.impacts && impactPrediction.impacts.length > 0);
+  
+  if (!hasRealData) {
+    return `## AI Analysis Summary\n\n**⏳ Analysis in Progress**\n\nAI analysis is still running. Results will appear when analysis completes.\n\n---\n*Updated: ${new Date().toISOString().split('T')[0]}*\n`;
+  }
+  
+  // Build comment sections - only include sections with real data
   let comment = buildHeaderSection(confidenceLevel, overallConfidence, tierInfo);
   comment += buildConfidenceBreakdown(confidenceComponents);
   comment += buildChangeClassificationSection(intentClassification);
@@ -329,8 +350,11 @@ function buildUnifiedAnalysisComment(allResults) {
   comment += buildImpactAnalysisSection(impactPrediction);
   comment += buildRecommendedActionsSection(overallConfidence, tierInfo);
   
-  comment += `\n---\n`;
-  comment += `*Updated: ${new Date().toISOString().split('T')[0]} • Complexity: ${tierInfo.score}/100 • Confidence: ${overallConfidence}%*\n`;
+  // Only add footer if we have real data
+  if (tierInfo) {
+    comment += `\n---\n`;
+    comment += `*Updated: ${new Date().toISOString().split('T')[0]} • Complexity: ${tierInfo.score}/100 • Confidence: ${overallConfidence}%*\n`;
+  }
   
   return comment;
 }
@@ -344,6 +368,15 @@ async function main({ github, context } = {}) {
     qualityGate: loadResults('.code-analysis/outputs/quality-gate-results.json'),
     impactPrediction: loadResults('.code-analysis/outputs/impact-prediction-results.json')
   };
+  
+  // Debug: Log what data we actually loaded
+  console.log('Loaded analysis results:', {
+    cognitive: !!allResults.cognitive?.total_score,
+    aiPreReview: !!allResults.aiPreReview?.risk_level,
+    intentClassification: !!allResults.intentClassification?.primary_intent,
+    qualityGate: allResults.qualityGate?.score !== undefined,
+    impactPrediction: !!allResults.impactPrediction?.impacts?.length
+  });
   
   const comment = buildUnifiedAnalysisComment(allResults);
   
