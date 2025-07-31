@@ -42,7 +42,6 @@ module.exports = async ({ github, context }) => {
 };
 
 function buildComment(results) {
-  const confidenceTier = getConfidenceTier(results);
   const riskLevel = getRiskLevel(results.risk_level);
   
   // Load quality gate results
@@ -53,8 +52,8 @@ function buildComment(results) {
   
   let comment = `## AI Pre-Review Analysis\n\n`;
   
-  // Header with key metrics (include quality score if available)
-  let headerMetrics = `**Confidence:** ${confidenceTier} | **Risk:** ${riskLevel} | **Files:** ${results.file_count}`;
+  // Header with key metrics (removed confidence to avoid conflicts with unified system)
+  let headerMetrics = `**Risk:** ${riskLevel} | **Files:** ${results.file_count}`;
   if (qualityResults && qualityResults.score !== undefined) {
     const qualityStatus = qualityResults.passed ? '✓' : '✗';
     // Ensure score is never 0 in display
@@ -118,25 +117,6 @@ function buildComment(results) {
   comment += `---\n*AI pre-review analysis • Priority: First reviewer focus*`;
 
   return comment;
-}
-
-function getConfidenceTier(results) {
-  const metrics = results.confidence_metrics || {};
-  const scores = Object.values(metrics);
-  
-  if (scores.includes('VERY HIGH') || scores.filter(s => s === 'HIGH').length >= 2) {
-    return 'VERY HIGH';
-  }
-  if (scores.includes('HIGH') || scores.filter(s => s === 'MEDIUM').length >= 2) {
-    return 'HIGH';
-  }
-  if (scores.includes('MEDIUM')) {
-    return 'MEDIUM';
-  }
-  if (scores.includes('LOW')) {
-    return 'LOW';
-  }
-  return 'VERY LOW';
 }
 
 function getRiskLevel(riskLevel) {

@@ -30,7 +30,6 @@ module.exports = async ({ github, context }) => {
 };
 
 function buildComment(results) {
-  const confidenceLevel = getConfidenceLevel(results.confidence);
   const intentLabel = getIntentLabel(results.primary_intent);
   
   // Build secondary intents string
@@ -44,7 +43,7 @@ function buildComment(results) {
     secondaryIntents = significant ? ` + ${significant}` : '';
   }
   
-  let comment = `## Change Intent | ${intentLabel}${secondaryIntents} | Confidence: ${confidenceLevel}\n\n`;
+  let comment = `## Change Intent | ${intentLabel}${secondaryIntents}\n\n`;
   
   // Quick summary
   const intentDescription = getIntentDescription(results.primary_intent, results.confidence);
@@ -96,13 +95,6 @@ function getIntentLabel(intent) {
   };
   
   return labels[intent.toLowerCase()] || intent.toUpperCase();
-}
-
-function getConfidenceLevel(confidence) {
-  if (confidence > 0.8) return 'HIGH';
-  if (confidence > 0.6) return 'MEDIUM';
-  if (confidence > 0.4) return 'LOW';
-  return 'VERY LOW';
 }
 
 function getIntentDescription(intent, confidence) {

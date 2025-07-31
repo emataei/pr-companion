@@ -45,6 +45,36 @@ Our system evaluates Pull Requests using a multi-dimensional scoring approach th
 
 ---
 
+## 🎯 Unified Confidence Framework
+
+Our system provides consistent confidence scoring across all AI analysis components to eliminate confusion and build reviewer trust.
+
+### Confidence Levels & Actions
+
+| Level | Range | Description | Review Action |
+|-------|-------|-------------|---------------|
+| **HIGH** | 80-100% | AI analysis is reliable, can guide review focus | Focus on AI-highlighted areas |
+| **MEDIUM** | 60-79% | AI provides useful insights, verify conclusions | Use AI as starting point, cross-reference |
+| **LOW** | 40-59% | AI offers basic classification, manual review required | AI context only, thorough manual review |
+| **VERY LOW** | <40% | Fallback analysis only, full manual review essential | Rely primarily on manual review |
+
+### Confidence Components
+
+The overall confidence is calculated from weighted components:
+
+1. **Change Classification** (30% weight): Confidence in determining PR intent (feature/bugfix/refactor)
+2. **Risk Assessment** (40% weight): Confidence in identifying potential risks and impacts  
+3. **Impact Analysis** (30% weight): Confidence in predicting downstream effects
+
+### Visual Indicators
+
+- 🟢 **HIGH**: Reliable AI analysis
+- 🟡 **MEDIUM**: Useful insights, verify conclusions  
+- 🟠 **LOW**: Basic classification only
+- 🔴 **VERY LOW**: Manual review essential
+
+---
+
 ## Tiered Review Framework
 
 ### Tier 0: Auto-Merge (0-30 points)
