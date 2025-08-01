@@ -284,7 +284,7 @@ class SemanticCommitAnalyzer:
         
         return visual
 
-    async def generate_narrative_summary(self, commits: List[CommitInfo]) -> Tuple[str, str]:
+    def generate_narrative_summary(self, commits: List[CommitInfo]) -> Tuple[str, str]:
         """Generate AI-powered what/why summary."""
         if not self.ai_client or not commits:
             return self._generate_fallback_summary(commits)
@@ -293,8 +293,19 @@ class SemanticCommitAnalyzer:
         prompt = self._build_ai_prompt(commit_context)
         
         try:
-            response = await self.ai_client.get_completion(prompt)
-            return self._parse_ai_response(response)
+            messages = [
+                {"role": "system", "content": "You are a code analysis assistant that creates concise PR summaries."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            response = self.ai_client.complete(
+                messages=messages,
+                model="gpt-4o-mini",  # Use the same model as other components
+                temperature=0.3,
+                max_tokens=200
+            )
+            
+            return self._parse_ai_response(response.choices[0].message.content)
         except Exception as e:
             print(f"AI summary failed: {e}")
             return self._generate_fallback_summary(commits)
@@ -360,7 +371,7 @@ class SemanticCommitAnalyzer:
         
         return what, why
 
-    async def analyze_pr(self) -> ChangeStory:
+    def analyze_pr(self) -> ChangeStory:
         """Main analysis method - generates complete semantic commit story."""
         commits = self.get_commit_history()
         
@@ -374,7 +385,7 @@ class SemanticCommitAnalyzer:
             commits_by_intent[commit.intent].append(commit)
         
         # Generate narrative
-        what, why = await self.generate_narrative_summary(commits)
+        what, why = self.generate_narrative_summary(commits)
         
         # Calculate impact
         impact_areas = self.generate_impact_areas(commits)
@@ -399,8 +410,7 @@ def main():
     analyzer = SemanticCommitAnalyzer()
     
     try:
-        import asyncio
-        story = asyncio.run(analyzer.analyze_pr())
+        story = analyzer.analyze_pr()
         
         # Output results
         results = {

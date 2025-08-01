@@ -769,25 +769,40 @@ def generate_visual_with_data(risk_score, risk_level, risk_color, review_time, t
                      fontsize=10, color='#7F8C8D')
     
     # RIGHT COLUMN: Change Distribution with improved positioning
-    ax_files.text(0.55, 0.8, "Change Distribution:", ha='left', va='top', 
+    ax_files.text(0.55, 0.85, "Change Distribution:", ha='left', va='top', 
                  fontsize=13, fontweight='bold', color='#2C3E50')
     
     # Get change distribution data
     change_dist = file_impact.get('change_distribution', {})
     modified_pct = change_dist.get('modified_percentage', 80)
     new_files_pct = change_dist.get('new_files_percentage', 20)
+    deleted_pct = change_dist.get('deleted_percentage', 0)
     
-    # Modified files bar with better positioning
+    # Ensure percentages add up to 100% by adjusting the largest category
+    total_pct = modified_pct + new_files_pct + deleted_pct
+    if total_pct != 100 and total_pct > 0:
+        # Find the largest category and adjust it
+        categories = [('modified', modified_pct), ('new', new_files_pct), ('deleted', deleted_pct)]
+        largest_cat, _ = max(categories, key=lambda x: x[1])
+        
+        if largest_cat == 'modified':
+            modified_pct += (100 - total_pct)
+        elif largest_cat == 'new':
+            new_files_pct += (100 - total_pct)
+        else:
+            deleted_pct += (100 - total_pct)
+    
+    # Modified files bar with better positioning and spacing
     bar_width = max(0.05, (modified_pct / 100) * 0.35)  # Scale to max 0.35 width
-    mod_rect = patches.Rectangle((0.55, 0.7), bar_width, 0.06, facecolor='#3498DB', alpha=0.8)
+    mod_rect = patches.Rectangle((0.55, 0.72), bar_width, 0.06, facecolor='#3498DB', alpha=0.8)
     ax_files.add_patch(mod_rect)
-    ax_files.text(0.92, 0.73, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.75, f"{modified_pct}% Modified", ha='left', va='center', fontsize=11, color='#2C3E50')
     
-    # New files bar with better positioning
+    # New files bar with better positioning and spacing
     new_bar_width = max(0.03, (new_files_pct / 100) * 0.35)  # Scale to max 0.35 width
-    new_rect = patches.Rectangle((0.55, 0.6), new_bar_width, 0.06, facecolor='#27AE60', alpha=0.8)
+    new_rect = patches.Rectangle((0.55, 0.62), new_bar_width, 0.06, facecolor='#27AE60', alpha=0.8)
     ax_files.add_patch(new_rect)
-    ax_files.text(0.92, 0.63, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
+    ax_files.text(0.92, 0.65, f"{new_files_pct}% New files", ha='left', va='center', fontsize=11, color='#2C3E50')
     
     ax_files.set_xlim(0, 1)
     ax_files.set_ylim(0, 1)
