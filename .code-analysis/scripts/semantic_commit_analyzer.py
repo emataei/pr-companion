@@ -85,13 +85,35 @@ class SemanticCommitAnalyzer:
     def get_commit_history(self) -> List[CommitInfo]:
         """Get commits for the current PR."""
         try:
-            result = subprocess.run([
-                'git', 'log', '--oneline', '--numstat', 
-                'origin/Master..HEAD', '--pretty=format:%H|%s'
-            ], capture_output=True, text=True, check=True)
+            # Try to detect the default branch dynamically
+            base_branch = os.environ.get('GITHUB_BASE_REF', 'main')
             
-            return self._parse_git_log_output(result.stdout)
-        except subprocess.CalledProcessError:
+            # Try different branch name variations
+            branches_to_try = [f'origin/{base_branch}', 'origin/main', 'origin/master']
+            
+            for branch in branches_to_try:
+                try:
+                    result = subprocess.run([
+                        'git', 'log', '--oneline', '--numstat', 
+                        f'{branch}..HEAD', '--pretty=format:%H|%s'
+                    ], capture_output=True, text=True, check=True)
+                    
+                    commits = self._parse_git_log_output(result.stdout)
+                    if commits:  # If we found commits, return them
+                        print(f"Found {len(commits)} commits using base branch: {branch}")
+                        return commits
+                    else:
+                        print(f"No commits found with base branch: {branch}")
+                        
+                except subprocess.CalledProcessError as e:
+                    print(f"Failed to get commits with base branch {branch}: {e}")
+                    continue
+            
+            print("No commits found with any base branch")
+            return []
+            
+        except Exception as e:
+            print(f"Error getting commit history: {e}")
             return []
 
     def _parse_git_log_output(self, git_output: str) -> List[CommitInfo]:
