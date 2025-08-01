@@ -85,6 +85,9 @@ pyvenv.cfg
 .code-analysis/outputs/*
 !.code-analysis/outputs/.gitkeep
 
+# SpecStory generated files and directories
+.specstory/
+
 # Generated analysis files (should be in outputs directory)
 cognitive_score.json
 cognitive-analysis-results.json

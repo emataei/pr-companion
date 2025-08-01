@@ -21,9 +21,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
     from scoring.ai_client_factory import AIClientFactory
+    from advanced_security_analyzer import AdvancedSecurityAnalyzer, SecurityRiskLevel
     AI_CLIENT_AVAILABLE = True
+    SECURITY_ANALYZER_AVAILABLE = True
 except ImportError:
     AI_CLIENT_AVAILABLE = False
+    SECURITY_ANALYZER_AVAILABLE = False
 
 # Constants
 MANUAL_REVIEW_REQUIRED = "Manual review required"
@@ -164,7 +167,88 @@ class AIPreReviewBot:
         return risk_score, risk_factors
     
     def assess_risk_level(self, files: List[str], diff: str) -> Tuple[str, List[str]]:
-        """Assess risk level based on files and changes"""
+        """Assess risk level using advanced security analysis and file patterns"""
+        all_risk_factors = []
+        
+        # Use advanced security analyzer if available
+        if SECURITY_ANALYZER_AVAILABLE:
+            security_risk, security_factors = self._assess_security_risk_advanced(files, diff)
+            all_risk_factors.extend(security_factors)
+        else:
+            # Fallback to basic pattern matching
+            security_risk, security_factors = self._assess_risk_basic(files, diff)
+            all_risk_factors.extend(security_factors)
+        
+        # Add file-based risk assessment
+        file_risk, file_factors = self._assess_file_risk_patterns(files)
+        all_risk_factors.extend(file_factors)
+        
+        # Determine overall risk level
+        max_risk = max(security_risk, file_risk) if security_risk and file_risk else (security_risk or file_risk or "LOW")
+        
+        return max_risk, all_risk_factors
+    
+    def _assess_security_risk_advanced(self, files: List[str], diff: str) -> Tuple[str, List[str]]:
+        """Use advanced security analyzer for sophisticated risk assessment"""
+        try:
+            # Prepare file changes for security analyzer
+            file_changes = []
+            
+            # Get actual file contents for analysis
+            for file_path in files:
+                if Path(file_path).exists():
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            file_changes.append({
+                                'file_path': file_path,
+                                'content': content
+                            })
+                    except Exception as e:
+                        print(f"Could not read file {file_path}: {e}")
+                        continue
+            
+            if not file_changes:
+                return "LOW", ["No files available for advanced security analysis"]
+            
+            # Run advanced security analysis
+            analyzer = AdvancedSecurityAnalyzer()
+            analyzer.analyze_file_changes(file_changes)
+            summary = analyzer.generate_summary()
+            
+            # Convert security risk to standard risk levels
+            security_risk_map = {
+                SecurityRiskLevel.CRITICAL.value: "HIGH",
+                SecurityRiskLevel.HIGH.value: "HIGH", 
+                SecurityRiskLevel.MEDIUM.value: "MEDIUM",
+                SecurityRiskLevel.LOW.value: "LOW",
+                SecurityRiskLevel.NONE.value: "LOW"
+            }
+            
+            risk_level = security_risk_map.get(summary['overall_risk'], "LOW")
+            
+            # Create detailed risk factors
+            risk_factors = []
+            if summary['critical_findings'] > 0:
+                risk_factors.append(f"Critical security issues detected: {summary['critical_findings']} findings")
+            if summary['high_findings'] > 0:
+                risk_factors.append(f"High-risk security issues detected: {summary['high_findings']} findings")
+            
+            # Add specific finding descriptions
+            for finding in summary.get('findings', [])[:3]:  # Limit to top 3 findings
+                risk_factors.append(f"{finding['description']} (Line {finding['line_number']} in {Path(finding['file_path']).name})")
+            
+            if not risk_factors:
+                risk_factors.append("Advanced security analysis completed - no significant issues detected")
+            
+            return risk_level, risk_factors
+            
+        except Exception as e:
+            print(f"Error in advanced security analysis: {e}")
+            return "MEDIUM", [f"Security analysis failed: {str(e)}"]
+    
+    def _assess_risk_basic(self, files: List[str], diff: str) -> Tuple[str, List[str]]:
+        """Fallback basic risk assessment using pattern matching"""
         total_risk_score = 0
         all_risk_factors = []
         
@@ -186,6 +270,37 @@ class AIPreReviewBot:
             return "MEDIUM", all_risk_factors
         else:
             return "LOW", all_risk_factors
+    
+    def _assess_file_risk_patterns(self, files: List[str]) -> Tuple[str, List[str]]:
+        """Assess risk based on file patterns and paths"""
+        risk_factors = []
+        max_risk = "LOW"
+        
+        critical_paths = [
+            '/security/', '/auth/', '/payment/', '/billing/',
+            '/admin/', '/migration/', '/schema/'
+        ]
+        
+        high_risk_files = [
+            'authentication', 'authorization', 'permissions',
+            'database', 'migration', 'schema', 'admin'
+        ]
+        
+        for file in files:
+            file_lower = file.lower()
+            
+            # Check for critical paths
+            if any(path in file_lower for path in critical_paths):
+                max_risk = "HIGH"
+                risk_factors.append(f"Critical path modification: {file}")
+            
+            # Check for high-risk file patterns
+            elif any(pattern in file_lower for pattern in high_risk_files):
+                if max_risk == "LOW":
+                    max_risk = "MEDIUM"
+                risk_factors.append(f"High-risk area modification: {file}")
+        
+        return max_risk, risk_factors
     
     def _adjust_risk_with_cognitive_analysis(self, risk_level: str, risk_factors: List[str]) -> str:
         """Adjust risk level based on cognitive complexity analysis results"""

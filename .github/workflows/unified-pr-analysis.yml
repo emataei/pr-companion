@@ -307,6 +307,21 @@ jobs:
           echo "AI-generated impact prediction analysis"
         continue-on-error: true
 
+      - name: Advanced Security Analysis
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_FOUNDRY_ENDPOINT: ${{ secrets.AI_FOUNDRY_ENDPOINT }}
+          AI_FOUNDRY_MODEL: ${{ secrets.AI_FOUNDRY_MODEL }}
+          AI_FOUNDRY_TOKEN: ${{ secrets.AI_FOUNDRY_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          echo "Running advanced security analysis..."
+          # The advanced security analyzer will be called by ai_pre_review.py
+          # when it detects security-related changes
+          echo "Advanced security analysis integrated into AI pre-review"
+        continue-on-error: true
+
       - name: Generate Semantic Commit Story
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
