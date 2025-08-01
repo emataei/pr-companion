@@ -286,11 +286,21 @@ class SemanticCommitAnalyzer:
 
     def generate_narrative_summary(self, commits: List[CommitInfo]) -> Tuple[str, str]:
         """Generate AI-powered what/why summary."""
-        if not self.ai_client or not commits:
+        print(f"Starting narrative generation with {len(commits)} commits")
+        print(f"AI client available: {self.ai_client is not None}")
+        
+        if not self.ai_client:
+            print("AI client not available, using intelligent fallback")
+            return self._generate_fallback_summary(commits)
+        
+        if not commits:
+            print("No commits found, using fallback")
             return self._generate_fallback_summary(commits)
         
         commit_context = self._prepare_commit_context(commits)
         prompt = self._build_ai_prompt(commit_context)
+        
+        print(f"Generated prompt length: {len(prompt)} characters")
         
         try:
             messages = [
@@ -298,6 +308,7 @@ class SemanticCommitAnalyzer:
                 {"role": "user", "content": prompt}
             ]
             
+            print(f"Sending AI request with {len(commits)} commits")
             response = self.ai_client.complete(
                 messages=messages,
                 model="gpt-4o-mini",  # Use the same model as other components
@@ -305,9 +316,21 @@ class SemanticCommitAnalyzer:
                 max_tokens=200
             )
             
-            return self._parse_ai_response(response.choices[0].message.content)
+            ai_response = response.choices[0].message.content
+            print(f"AI response received: {ai_response}")
+            
+            parsed_result = self._parse_ai_response(ai_response)
+            print(f"Parsed result: What='{parsed_result[0]}', Why='{parsed_result[1]}'")
+            
+            # Check if parsing failed and fallback to intelligent analysis
+            if parsed_result[0] == "Code changes implemented" or not parsed_result[0]:
+                print("AI parsing failed, using intelligent fallback")
+                return self._generate_fallback_summary(commits)
+            
+            return parsed_result
         except Exception as e:
             print(f"AI summary failed: {e}")
+            print("Using intelligent fallback")
             return self._generate_fallback_summary(commits)
 
     def _prepare_commit_context(self, commits: List[CommitInfo]) -> List[Dict]:
@@ -322,18 +345,16 @@ class SemanticCommitAnalyzer:
 
     def _build_ai_prompt(self, commit_context: List[Dict]) -> str:
         """Build the AI prompt for narrative generation."""
-        return f"""
-        Analyze these commits and generate a brief, reviewer-friendly summary:
-        
-        Commits: {json.dumps(commit_context, indent=2)}
-        
-        Generate:
-        1. WHAT (1-2 sentences): What does this PR accomplish?
-        2. WHY (1-2 sentences): Why was this change needed?
-        
-        Keep it concise and focused on the business value and technical necessity.
-        Avoid implementation details - focus on the story and impact.
-        """
+        return f"""Analyze these commits and generate a brief, reviewer-friendly summary.
+
+Commits: {json.dumps(commit_context, indent=2)}
+
+Please respond in this exact format:
+
+WHAT: [1-2 sentences describing what this PR accomplishes]
+WHY: [1-2 sentences explaining why this change was needed]
+
+Focus on business value and technical necessity. Avoid implementation details."""
 
     def _parse_ai_response(self, response: str) -> Tuple[str, str]:
         """Parse AI response to extract what/why statements."""
@@ -342,32 +363,143 @@ class SemanticCommitAnalyzer:
         why_line = ""
         
         for line in lines:
-            if line.strip().startswith(('WHAT', '1.')):
-                what_line = line.split(':', 1)[1].strip() if ':' in line else line.strip()
-            elif line.strip().startswith(('WHY', '2.')):
-                why_line = line.split(':', 1)[1].strip() if ':' in line else line.strip()
+            line_stripped = line.strip()
+            if line_stripped.startswith(('WHAT:', 'What:', 'what:', '1.')):
+                # Extract everything after the colon
+                if ':' in line_stripped:
+                    what_line = line_stripped.split(':', 1)[1].strip()
+                else:
+                    what_line = line_stripped
+            elif line_stripped.startswith(('WHY:', 'Why:', 'why:', '2.')):
+                # Extract everything after the colon
+                if ':' in line_stripped:
+                    why_line = line_stripped.split(':', 1)[1].strip()
+                else:
+                    why_line = line_stripped
+        
+        # Clean up the extracted text (remove quotes, extra spaces, etc.)
+        what_line = what_line.strip(' "\'').strip()
+        why_line = why_line.strip(' "\'').strip()
+        
+        print(f"Parsed - What: '{what_line}', Why: '{why_line}'")
         
         return what_line or "Code changes implemented", why_line or "Improvement needed"
 
     def _generate_fallback_summary(self, commits: List[CommitInfo]) -> Tuple[str, str]:
-        """Generate basic summary without AI."""
+        """Generate intelligent summary by analyzing commit messages and changes."""
         if not commits:
             return "No commits found", "Initial changes"
         
-        # Count intents and scopes
-        intent_counts = defaultdict(int)
-        scope_counts = defaultdict(int)
+        # Analyze commit messages for intent and actions
+        all_messages = " ".join([commit.message.lower() for commit in commits])
+        
+        # Enhanced intent analysis
+        intent_analysis = {
+            'fixing': ['fix', 'bug', 'error', 'issue', 'resolve', 'correct', 'repair'],
+            'adding': ['add', 'implement', 'create', 'new', 'introduce', 'build'],
+            'improving': ['improve', 'enhance', 'optimize', 'update', 'upgrade', 'refactor'],
+            'updating': ['update', 'modify', 'change', 'edit', 'adjust'],
+            'removing': ['remove', 'delete', 'clean', 'cleanup', 'deprecate'],
+            'configuring': ['config', 'setup', 'configure', 'setting', 'env'],
+            'testing': ['test', 'spec', 'coverage', 'mock', 'verify'],
+            'documenting': ['doc', 'readme', 'comment', 'documentation'],
+            'styling': ['style', 'format', 'lint', 'prettier', 'css'],
+            'securing': ['security', 'auth', 'permission', 'validate', 'sanitize']
+        }
+        
+        # Score each intent based on commit messages
+        intent_scores = {}
+        for intent, keywords in intent_analysis.items():
+            score = sum(1 for keyword in keywords if keyword in all_messages)
+            if score > 0:
+                intent_scores[intent] = score
+        
+        # Get primary intent
+        primary_intent = max(intent_scores.items(), key=lambda x: x[1])[0] if intent_scores else 'updating'
+        
+        # Analyze file changes for scope
+        all_files = []
+        total_additions = sum(commit.insertions for commit in commits)
+        total_deletions = sum(commit.deletions for commit in commits)
         
         for commit in commits:
-            intent_counts[commit.intent] += 1
-            scope_counts[commit.scope] += 1
+            all_files.extend(commit.files_changed)
         
-        # Generate what
-        main_intent = max(intent_counts.items(), key=lambda x: x[1])[0]
-        main_scope = max(scope_counts.items(), key=lambda x: x[1])[0]
+        # Enhanced scope analysis
+        scope_analysis = {
+            'authentication': ['auth', 'login', 'user', 'session', 'token'],
+            'user interface': ['ui', 'component', '.tsx', '.jsx', '.vue', 'style', '.css'],
+            'API endpoints': ['api', 'route', 'endpoint', 'controller', 'handler'],
+            'database': ['db', 'database', 'migration', 'schema', 'model'],
+            'configuration': ['config', '.env', 'setting', 'webpack', 'package.json'],
+            'testing': ['test', 'spec', '__tests__', '.test.', '.spec.'],
+            'documentation': ['.md', 'readme', 'docs'],
+            'build system': ['build', 'dist', 'webpack', 'vite', 'docker'],
+            'security': ['security', 'permission', 'validate', 'sanitize'],
+            'error handling': ['error', 'exception', 'catch', 'try'],
+            'performance': ['performance', 'optimize', 'cache', 'speed'],
+            'data processing': ['process', 'parse', 'format', 'transform']
+        }
         
-        what = f"Implements {main_intent} changes to {main_scope} components"
-        why = f"Updates needed for {main_scope} functionality improvement"
+        # Score scopes based on files and commit messages
+        scope_scores = {}
+        for scope, keywords in scope_analysis.items():
+            file_score = sum(1 for file in all_files for keyword in keywords if keyword in file.lower())
+            message_score = sum(1 for keyword in keywords if keyword in all_messages)
+            total_score = file_score * 2 + message_score  # Weight file changes more
+            if total_score > 0:
+                scope_scores[scope] = total_score
+        
+        # Get primary scope
+        primary_scope = max(scope_scores.items(), key=lambda x: x[1])[0] if scope_scores else 'codebase'
+        
+        # Generate intelligent WHAT statement
+        what_templates = {
+            'fixing': f"Fixes issues in {primary_scope}",
+            'adding': f"Adds new {primary_scope} functionality", 
+            'improving': f"Improves {primary_scope} implementation",
+            'updating': f"Updates {primary_scope} components",
+            'removing': f"Removes deprecated {primary_scope} code",
+            'configuring': f"Configures {primary_scope} settings",
+            'testing': f"Adds test coverage for {primary_scope}",
+            'documenting': f"Updates {primary_scope} documentation",
+            'styling': f"Improves {primary_scope} styling and formatting",
+            'securing': f"Enhances {primary_scope} security measures"
+        }
+        
+        base_what = what_templates.get(primary_intent, f"Updates {primary_scope}")
+        
+        # Add scale information
+        if len(commits) > 3:
+            what = f"{base_what} across {len(commits)} commits"
+        elif total_additions + total_deletions > 100:
+            what = f"{base_what} with significant changes ({total_additions}+ lines)"
+        else:
+            what = base_what
+        
+        # Generate intelligent WHY statement
+        why_templates = {
+            'fixing': "to resolve bugs and improve system stability",
+            'adding': "to extend functionality and meet new requirements",
+            'improving': "to enhance performance and maintainability", 
+            'updating': "to keep components current and aligned",
+            'removing': "to reduce technical debt and simplify codebase",
+            'configuring': "to optimize system behavior and deployment",
+            'testing': "to ensure code quality and prevent regressions",
+            'documenting': "to improve developer experience and onboarding",
+            'styling': "to maintain consistent code style and readability",
+            'securing': "to protect against vulnerabilities and ensure data safety"
+        }
+        
+        base_why = why_templates.get(primary_intent, "to improve the overall system")
+        
+        # Add context from file analysis
+        if len(scope_scores) > 1:
+            secondary_scopes = sorted(scope_scores.items(), key=lambda x: x[1], reverse=True)[1:3]
+            scope_list = [scope for scope, _ in secondary_scopes]
+            why = f"{base_why} and update {', '.join(scope_list)}"
+        else:
+            why = base_why
         
         return what, why
 
