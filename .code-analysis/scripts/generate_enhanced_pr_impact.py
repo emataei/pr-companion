@@ -203,12 +203,41 @@ def analyze_file_impact() -> Dict[str, Any]:
                 else:
                     modified_count += 1
             
-            # Calculate percentages
+            # Calculate percentages with proper rounding to ensure they add up to 100%
             total = len(diff_data)
             if total > 0:
-                file_data["change_distribution"]["modified_percentage"] = int((modified_count / total) * 100)
-                file_data["change_distribution"]["new_files_percentage"] = int((new_count / total) * 100)
-                file_data["change_distribution"]["deleted_percentage"] = int((deleted_count / total) * 100)
+                modified_pct = (modified_count / total) * 100
+                new_pct = (new_count / total) * 100
+                deleted_pct = (deleted_count / total) * 100
+                
+                # Round percentages and ensure they add up to 100%
+                rounded_modified = round(modified_pct)
+                rounded_new = round(new_pct)
+                rounded_deleted = round(deleted_pct)
+                
+                # Adjust for rounding errors to ensure total = 100%
+                total_rounded = rounded_modified + rounded_new + rounded_deleted
+                if total_rounded != 100:
+                    # Find the category with the largest remainder and adjust it
+                    remainders = [
+                        ('modified', modified_pct - rounded_modified, rounded_modified),
+                        ('new', new_pct - rounded_new, rounded_new),
+                        ('deleted', deleted_pct - rounded_deleted, rounded_deleted)
+                    ]
+                    # Sort by remainder (descending) and adjust the largest
+                    remainders.sort(key=lambda x: abs(x[1]), reverse=True)
+                    diff = 100 - total_rounded
+                    
+                    if remainders[0][0] == 'modified':
+                        rounded_modified += diff
+                    elif remainders[0][0] == 'new':
+                        rounded_new += diff
+                    else:
+                        rounded_deleted += diff
+                
+                file_data["change_distribution"]["modified_percentage"] = rounded_modified
+                file_data["change_distribution"]["new_files_percentage"] = rounded_new
+                file_data["change_distribution"]["deleted_percentage"] = rounded_deleted
             
             # Update counts
             file_data["risk_categories"]["high_risk"]["count"] = len(file_data["risk_categories"]["high_risk"]["files"])

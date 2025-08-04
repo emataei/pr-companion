@@ -250,10 +250,10 @@ def main():
     """Main entry point for GitHub Actions."""
     changed_files = os.getenv('CHANGED_FILES', '')
     
-    # Load quality penalty from quality gate results
+    # Load quality penalty from quality gate results in outputs directory
     quality_penalty = 0
     try:
-        with open('quality-gate-results.json', 'r') as f:
+        with open('.code-analysis/outputs/quality-gate-results.json', 'r') as f:
             quality_results = json.load(f)
             quality_penalty = quality_results.get('penalty', 0)
     except Exception:
