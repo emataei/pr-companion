@@ -169,7 +169,7 @@ function createMiniProgressBar(percentage) {
 }
 
 function buildChangeClassificationSection(intentClassification) {
-  if (!intentClassification.primary_intent) return '';
+  if (!intentClassification || !intentClassification.primary_intent) return '';
   
   let section = `### Change Type\n\n`;
   const intent = intentClassification.primary_intent.toUpperCase();
@@ -206,7 +206,7 @@ function getChangeTypeEmoji(type) {
 }
 
 function buildRiskAssessmentSection(aiPreReview) {
-  if (!aiPreReview.risk_level) return '';
+  if (!aiPreReview || !aiPreReview.risk_level) return '';
   
   let section = `### Risk Assessment\n\n`;
   const riskLevel = aiPreReview.risk_level;
@@ -226,7 +226,7 @@ function buildRiskAssessmentSection(aiPreReview) {
 }
 
 function buildQualityGateSection(qualityGate) {
-  if (qualityGate.score === undefined) return '';
+  if (!qualityGate || qualityGate.score === undefined) return '';
   
   let section = `### Quality Gate\n\n`;
   const qualityStatus = qualityGate.passed ? '✅ PASS' : '❌ FAIL';
@@ -246,7 +246,7 @@ function buildQualityGateSection(qualityGate) {
 }
 
 function buildImpactAnalysisSection(impactPrediction) {
-  if (!impactPrediction.impacts?.length) return '';
+  if (!impactPrediction || !impactPrediction.impacts?.length) return '';
   
   let section = `### Impact Analysis\n\n`;
   const criticalImpacts = impactPrediction.impacts.filter(i => i.severity === 'critical');

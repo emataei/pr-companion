@@ -144,7 +144,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: code-quality-analysis-results
-          path: quality-gate-results.json
+          path: .code-analysis/outputs/quality-gate-results.json
         if: always()
 
       - name: Upload Technical Analysis Artifacts
