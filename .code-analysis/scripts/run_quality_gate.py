@@ -170,8 +170,9 @@ def main():
                 f.write(f"penalty={result['penalty']}\n")
                 f.write(f"blocking_issues={result['blocking_issues']}\n")
         
-        # Create detailed results file
-        with open('quality-gate-results.json', 'w') as f:
+        # Create detailed results file in outputs directory
+        os.makedirs('.code-analysis/outputs', exist_ok=True)
+        with open('.code-analysis/outputs/quality-gate-results.json', 'w') as f:
             json.dump(result, f, indent=2)
         
         # Exit with error code if quality gate fails

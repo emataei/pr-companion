@@ -559,9 +559,13 @@ def main():
         # Ensure outputs directory exists
         os.makedirs('.code-analysis/outputs', exist_ok=True)
         
-        # Write to JSON for GitHub Actions
-        with open('.code-analysis/outputs/semantic-commit-analysis.json', 'w') as f:
+        # Write to JSON for GitHub Actions - outputs directory only
+        output_path = '.code-analysis/outputs/semantic-commit-analysis.json'
+        
+        with open(output_path, 'w') as f:
             json.dump(results, f, indent=2)
+        
+        print(f"Semantic analysis saved to: {output_path}")
         
         print("Semantic commit analysis completed successfully")
         print(f"What: {story.what}")

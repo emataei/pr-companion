@@ -104,20 +104,16 @@ class AIPreReviewBot:
     
     def load_quality_gate_results(self) -> Optional[Dict]:
         """Load quality gate results from code quality analysis"""
-        possible_paths = [
-            './quality-results/quality-gate-results.json',
-            './.code-analysis/outputs/quality-gate-results.json',
-            './quality-gate-results.json'
-        ]
+        quality_path = '.code-analysis/outputs/quality-gate-results.json'
         
-        for path in possible_paths:
-            if Path(path).exists():
-                try:
-                    with open(path, 'r') as f:
-                        return json.load(f)
-                except Exception as e:
-                    print(f"Error loading quality gate results from {path}: {e}")
-                    continue
+        if Path(quality_path).exists():
+            try:
+                with open(quality_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading quality gate results from {quality_path}: {e}")
+        else:
+            print(f"Quality gate results not found at {quality_path}")
         
         print("No quality gate results found")
         return None
@@ -305,10 +301,8 @@ class AIPreReviewBot:
     def _adjust_risk_with_cognitive_analysis(self, risk_level: str, risk_factors: List[str]) -> str:
         """Adjust risk level based on cognitive complexity analysis results"""
         try:
-            # Try to load cognitive analysis results
+            # Load cognitive analysis results from outputs directory
             cognitive_path = Path('.code-analysis/outputs/cognitive-analysis-results.json')
-            if not cognitive_path.exists():
-                cognitive_path = Path('cognitive-analysis-results.json')
             
             if cognitive_path.exists():
                 with open(cognitive_path, 'r') as f:
