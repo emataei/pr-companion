@@ -321,9 +321,9 @@ function buildUnifiedAnalysisComment(allResults) {
   
   // Calculate confidence components - only use real data, no fallbacks
   const confidenceComponents = {
-    changeClassification: intentClassification.confidence ? Math.round(intentClassification.confidence * 100) : null,
+    changeClassification: intentClassification?.confidence ? Math.round(intentClassification.confidence * 100) : null,
     riskAssessment: getRiskAssessmentScore(aiPreReview),
-    impactAnalysis: impactPrediction.overall_risk_score ? Math.round((1 - impactPrediction.overall_risk_score) * 100) : null
+    impactAnalysis: impactPrediction?.overall_risk_score ? Math.round((1 - impactPrediction.overall_risk_score) * 100) : null
   };
   
   const overallConfidence = calculateOverallConfidence(confidenceComponents);
@@ -332,10 +332,10 @@ function buildUnifiedAnalysisComment(allResults) {
   
   // Only build comment if we have some real data
   const hasRealData = tierInfo || 
-                     intentClassification.primary_intent || 
-                     aiPreReview.risk_level || 
-                     (qualityGate.score !== undefined) || 
-                     (impactPrediction.impacts && impactPrediction.impacts.length > 0);
+                     intentClassification?.primary_intent || 
+                     aiPreReview?.risk_level || 
+                     (qualityGate?.score !== undefined) || 
+                     (impactPrediction?.impacts && impactPrediction.impacts.length > 0);
   
   if (!hasRealData) {
     return `## AI Analysis Summary\n\n**⏳ Analysis in Progress**\n\nAI analysis is still running. Results will appear when analysis completes.\n\n---\n*Updated: ${new Date().toISOString().split('T')[0]}*\n`;

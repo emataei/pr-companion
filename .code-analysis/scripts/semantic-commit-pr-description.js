@@ -113,7 +113,7 @@ module.exports = async ({ github, context }) => {
     return;
   }
   
-  const results = loadResults('semantic-commit-analysis.json', {
+  const results = loadResults('.code-analysis/outputs/semantic-commit-analysis.json', {
     semantic_analysis: {
       what: 'Changes implemented',
       why: 'Improvements needed',
