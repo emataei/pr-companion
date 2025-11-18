@@ -488,6 +488,12 @@ jobs:
           echo "Running development flow script..."
           python .code-analysis/scripts/generate_development_flow.py
 
+      - name: Generate code change heat map
+        run: |
+          echo "Generating PR code change heat map..."
+          python .code-analysis/scripts/generate_code_change_heatmap.py
+        continue-on-error: true
+
       - name: Generate enhanced visuals report
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
@@ -728,4 +734,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const script = require('./.code-analysis/scripts/github-pages-visual-pr-comment.js');
+            return await script({ github, context });
+
+      - name: Comment PR with code change heat map
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const script = require('./.code-analysis/scripts/heatmap-pr-comment.js');
             return await script({ github, context });
